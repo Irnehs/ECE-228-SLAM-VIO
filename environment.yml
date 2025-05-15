@@ -1,0 +1,4 @@
+name: ece228-slam-vio
+channels:
+  - defaults
+prefix: /opt/homebrew/Caskroom/miniconda/base/envs/ece228-slam-vio
