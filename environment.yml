@@ -1,4 +1,12 @@
 name: ece228-slam-vio
 channels:
   - defaults
+dependencies:
+  - python=3.12
+  - torchaudio
+  - cpuonly
+  - pytorch
+  - torchvision
+  - pandas
+  - ipykernel
 prefix: /opt/homebrew/Caskroom/miniconda/base/envs/ece228-slam-vio
