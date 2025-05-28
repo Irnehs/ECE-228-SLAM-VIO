@@ -1,0 +1,28 @@
+model:
+    seq_len: 10
+    prediction_len: 10
+    image_embed_size: 256
+    imu_embed_size: 256
+dataset:
+    data_path: ""
+    seq_len: 20
+    train_batch_size: 64
+    val_batch_size:  64
+    num_workers: 4
+trainer:
+    max_epochs: 20
+    LR: 0.0015
+    gpus: [0]
+logging:
+    save_dir: "logs/"
+    name: "SLAMErrorPrediction"
+experiment:
+    weight_decay: .005
+    scheduler: "ExponentialLR"
+    scheduler_gamma: 0.975
+    step_size: 1
+    manual_seed: 228
+loss:
+    name: MSELoss
+    args:
+        # Add args if needed

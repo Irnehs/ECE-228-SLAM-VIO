@@ -4,14 +4,17 @@ import numpy as np
 import torch.nn.functional as F
 
 class ImageEncoder(nn.Module):
-    def __init__(self, ch_in=3, out_dim=1280):
+    """
+    Takes in N number of images from an individual camera. Expected input shape: (B, seq_len, C, H, W), output shape: (B, seq_len, out_dim)
+    """
+    def __init__(self, seq_len, ch_in=3, out_dim=1280):
         super(ImageEncoder, self).__init__()
-        self.mobile_net = MobileNetV2(ch_in, out_dim)
+        self.mobile_net = MobileNetV2(seq_len, ch_in, out_dim)
+        self.seq_len = seq_len
 
     def forward(self, x):
         y = self.mobile_net(x)
         return y
-
 
 """
 Code below is adapted from a MobileNet V2 implementation on GitHub at https://github.com/jmjeon2/MobileNet-Pytorch.
@@ -109,12 +112,15 @@ class MobileNetV2(nn.Module):
 
     def forward(self, x):
         """
-        This encoder assumes images come in in (B*seq_len, C, H, W), and outputs in shape (B, seq_len, out_dim)
+        This encoder assumes images come in in (B, seq_len, C, H, W), and outputs in shape (B, seq_len, out_dim)
         """
+        B, seq_len, C, H, W = x.shape
+        assert seq_len == self.seq_len, "Passed in incorrect seq_len during initialization"
+        
         x_flat = x.view(-1, C, H, W)    # → (B*seq_len, C, H, W)
         
         y = self.stem_conv(x_flat)
         y = self.layers(y)
-        y = self.last_conv(y)
-        y = self.avg_pool(y).view(-1, self.out_dim)
+        y = self.last_conv(y)  # (B*seq_len, out_dim, H, W)
+        y = self.avg_pool(y).view(-1, self.out_dim)  # (B*seq_len, out_dim, 1, 1) --[view]-> (B*seq_len, out_dim)
         return y.view(B, self.seq_len, out_dim)
