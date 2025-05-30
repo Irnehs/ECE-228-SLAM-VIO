@@ -8,42 +8,110 @@ from FusionRNN import FusionRNN
 from ImageEncoder import ImageEncoder
 from IMUEncoder import IMUEncoder
 
+
 # This will be the overarching class that connects all 4 of our NNs
 class SLAMErrorPredictor(nn.Module):
-    def __init__(self, seq_len, image_embed_size=256, imu_embed_size=256, loss_fnc=None, lr=1e-3, weight_decay=0):
-        super(SLAMErrorPredictor, self).__init__()        
-        self.seq_len = seq_len  # N
-        self.loss_fnc = loss_fnc or nn.MSELoss()
+    def __init__(
+        self,
+        seq_len,
+        image_width=24,
+        image_height=24,
+        image_channels=1,
+        loss_fnc=None,
+        lr=1e-3,
+        weight_decay=0,
+        imu_input_size=6,
+        imu_embed_size=None,
+        imu_dropout=0.3,
+        imu_hidden_size=128,
+        fusion_hidden_size=128,
+        fusion_dropout=0.3,
+    ):
+        super(SLAMErrorPredictor, self).__init__()
+        self.seq_len = seq_len  # The number of image frames in the sequence - (N)
 
-        # TODO object arguments
+        self.loss_fnc = loss_fnc or nn.MSELoss()  # Default loss function is MSE
+
+        self.W = image_width  # Default image width is 24
+        self.H = image_height  # Default image height is 24
+        self.C = image_channels  # Assumes grayscale by default
+        self.I_e = self.H * self.W  # Image embedding size (H * W)
+
+        self.M = imu_input_size  # IMU input size, default is 6 (3-axis accel + gyro)
+        self.M_e = (  # IMU embedding size, if none is provided, defaults to M * 10 (10 IMU updates per image frame)
+            imu_embed_size or self.M * 10
+        )
+        self.imu_dropout = imu_dropout
+        self.imu_hidden_size = imu_hidden_size
+
+        self.E = (  # Total embedding size for the fusion branch (2 images + IMU)
+            self.I_e * 2 + self.M_e
+        )
+        self.fusion_dropout = (  # Default dropout for the fusion branch is 0.3
+            fusion_dropout
+        )
+        self.F = fusion_hidden_size  # Fusion hidden size, default is 128
+
+        self.imu_encoder = IMUEncoder(
+            input_dim=self.M,
+            hidden_dim=self.imu_hidden_size,
+            output_dim=self.M_e,
+            dropout=self.imu_dropout,
+            window_size=self.seq_len * 10,
+        )
+
+        self.image_encoder_L = ImageEncoder(
+            seq_len=self.seq_len,
+            ch_in=self.C,
+            out_dim=self.I_e,
+        )
+
+        self.image_encoder_R = ImageEncoder(
+            seq_len=self.seq_len,
+            ch_in=self.C,
+            out_dim=self.I_e,
+        )
+
+        self.fusion = FusionRNN(
+            input_dim=self.E,  # E is the summed embedding size of the 3 encoders (I_e * 2 + M_e)
+            output_dim=self.F,  # F is the fusion hidden size
+            hidden_dim=self.fusion_hidden_size,
+            bidirectional=False,
+            dropout=self.fusion_dropout,
+        )
+
         self.decoder = Decoder()
-        self.fusion = FusionRNN()
-        self.image_encoder_L = ImageEncoder(seq_len, output_dim=image_embed_size)
-        self.image_encoder_R = ImageEncoder(seq_len, output_dim=image_embed_size)
-        self.imu_encoder = IMUEncoder()
 
     def forward(self, x, prediction_len):
         """
         Assuming data pipeline feeds us a list of 3 inputs: L img, R img, IMU data, in that order of a list. Each image comes in after 10 IMU update cycles.
         image shape: [B,N,C,H,W], N = # of 20 Hz updates (seq_len)
-        imu data: [B,10N,7]?
+        imu data: [B,10N,6]
 
         Once fed into encoders, expected cat shape [B, N, E], where E is the summed embedding sizes for the 3 encoder outputs. Inputs into fusion branch
         which will output a shape [B, ..., ...] which is then fed into the decoder.
 
         The decoder will output K future pose readings (prediction_len) with shape [B, K, 7]
         """
-        img_L = x[0]
-        img_R = x[1]
-        imu = x[2]
+        img_L = x[0]  # [B, N, C, H, W]
+        img_R = x[1]  # [B, N, C, H, W]
+        imu = x[2]  # [B, 10N, M]
 
-        V_L = self.image_encoder_L(img_L)
-        V_R = self.image_encoder_R(img_R)
-        I = self.imu_encoder(imu)
+        V_L = self.image_encoder_L(img_L)  # [B, N, I_e]
+        V_R = self.image_encoder_R(img_R)  # [B, N, I_e]
+        I = self.imu_encoder(imu)  # [B, N, M_e]
 
-        assert V_L.shape[0:-1] == V_R.shape[0:-1] == I.shape[0:-1], "Encoder shape mismatch"
+        assert (
+            V_L.shape[0:-1] == V_R.shape[0:-1] == I.shape[0:-1]
+        ), "Encoder shape mismatch"
 
-        encoded_features = torch.cat((V_L, V_R, I), -1)  # [B, N, E]
-        full_encoding = self.fusion(encoded_features)  # [B, N, F]?
-        out = self.decoder(full_encoding, prediction_len)  # [B, K, 7], K future pose readings, of which there are 7 values
+        encoded_features = torch.cat(  # [B, N, E] where E is the summed embedding size of the 3 encoders (I_e * 2 + M_e)
+            (V_L, V_R, I), -1
+        )
+        full_encoding = self.fusion(  # [B, N, F] where F is the fusion hidden size
+            encoded_features
+        )
+        out = self.decoder(  # [B, 1, 7], Estimate of the current pose at the end of the sequence
+            full_encoding, prediction_len
+        )
         return out
