@@ -21,6 +21,7 @@ class IMUEncoder(nn.Module):
 
     def forward(self, x):
         B, T, D = x.shape
+        # print('imu forward shape: ', x.shape)
         assert (
             T % self.window_size == 0
         ), f"Input sequence length {T} must be a multiple of window size {self.window_size}"
