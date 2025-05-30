@@ -130,6 +130,7 @@ class MobileNetV2(nn.Module):
         """
         This encoder assumes images come in in (B, seq_len, C, H, W), and outputs in shape (B, seq_len, out_dim)
         """
+        print(x.shape)
         B, seq_len, C, H, W = x.shape
         assert (
             seq_len == self.seq_len
@@ -143,4 +144,4 @@ class MobileNetV2(nn.Module):
         y = self.avg_pool(y).view(
             -1, self.out_dim
         )  # (B*seq_len, out_dim, 1, 1) --[view]-> (B*seq_len, out_dim)
-        return y.view(B, self.seq_len, out_dim)
+        return y.view(B, self.seq_len, self.out_dim)

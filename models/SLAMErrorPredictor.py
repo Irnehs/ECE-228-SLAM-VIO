@@ -3,25 +3,23 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 
-from Decoder import Decoder
-from FusionRNN import FusionRNN
-from ImageEncoder import ImageEncoder
-from IMUEncoder import IMUEncoder
+from .Decoder import Decoder
+from .FusionRNN import FusionRNN
+from .ImageEncoder import ImageEncoder
+from .IMUEncoder import IMUEncoder
 
 
 # This will be the overarching class that connects all 4 of our NNs
 class SLAMErrorPredictor(nn.Module):
     def __init__(
         self,
-        seq_len,
+        seq_len=1,
         image_width=24,
         image_height=24,
         image_channels=1,
-        loss_fnc=None,
-        lr=1e-3,
-        weight_decay=0,
+        image_embed_size=64,
         imu_input_size=6,
-        imu_embed_size=None,
+        imu_embed_size=64,
         imu_dropout=0.3,
         imu_hidden_size=128,
         fusion_output_dim=64,
@@ -32,12 +30,10 @@ class SLAMErrorPredictor(nn.Module):
         super(SLAMErrorPredictor, self).__init__()
         self.seq_len = seq_len  # The number of image frames in the sequence - (N)
 
-        self.loss_fnc = loss_fnc or nn.MSELoss()  # Default loss function is MSE
-
         self.W = image_width  # Default image width is 24
         self.H = image_height  # Default image height is 24
         self.C = image_channels  # Assumes grayscale by default
-        self.I_e = self.H * self.W  # Image embedding size (H * W)
+        self.I_e = image_embed_size  # Image embedding size
 
         self.M = imu_input_size  # IMU input size, default is 6 (3-axis accel + gyro)
         self.M_e = (  # IMU embedding size, if none is provided, defaults to M * 10 (10 IMU updates per image frame)
@@ -92,7 +88,7 @@ class SLAMErrorPredictor(nn.Module):
             dropout=self.fusion_dropout,
         )
 
-    def forward(self, x, prediction_len):
+    def forward(self, x, prediction_len=10):
         """
         Assuming data pipeline feeds us a list of 3 inputs: L img, R img, IMU data, in that order of a list. Each image comes in after 10 IMU update cycles.
         image shape: [B,N,C,H,W], N = # of 20 Hz updates (seq_len)
@@ -103,9 +99,10 @@ class SLAMErrorPredictor(nn.Module):
 
         The decoder will output K future pose readings (prediction_len) with shape [B, K, 7]
         """
-        img_L = x[0]  # [B, N, C, H, W]
-        img_R = x[1]  # [B, N, C, H, W]
-        imu = x[2]  # [B, 10N, M]
+        imu = x[0]  # [B, 10N, M]
+        img_L = x[1]  # [B, N, C, H, W]
+        img_R = x[2]  # [B, N, C, H, W]
+
 
         V_L = self.image_encoder_L(img_L)  # [B, N, I_e]
         V_R = self.image_encoder_R(img_R)  # [B, N, I_e]

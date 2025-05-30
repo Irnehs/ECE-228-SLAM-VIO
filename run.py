@@ -1,9 +1,13 @@
-from argparse import ArgumentParser
-from lightning.pytorch import Trainer, seed_everything
+from lightning.pytorch import seed_everything
 from lightning.pytorch.loggers import TensorBoardLogger
 import yaml
 import torch.nn as nn
+import lightning.pytorch as pl
+import argparse
+from torch.utils.data import DataLoader
+import os
 
+from src.data_processing import IMUImageDataset, prep_combined_csv
 from models.SLAMErrorPredictor import SLAMErrorPredictor
 from experiment import Experiment
 
@@ -32,11 +36,11 @@ if __name__ == "__main__":
     args_dict = loss_cfg.get("args") or {}
     loss_fnc  = loss_class(**args_dict)
 
-    # For reproducibility
     seed_everything(config['experiment']['manual_seed'], True)
         
     model = SLAMErrorPredictor(**config['model'])
     experiment = Experiment(
+        model,
         loss_fnc=loss_fnc,
         lr=config['trainer']['LR'],
         weight_decay=config["experiment"]["weight_decay"],
@@ -44,10 +48,24 @@ if __name__ == "__main__":
         scheduler_gamma=config["experiment"]["scheduler_gamma"],
         step_size=config["experiment"]["step_size"],
     )
-    
-    # TODO slot in data pipelining into train_data and val_data
-    train_data = DummyIMUDataset(seq_len=20, num_samples=2000)  # TODO
-    val_data   = DummyIMUDataset(seq_len=20, num_samples=500)  # TODO
+
+    data_path = config['dataset']['data_path']
+    csv_path = config['dataset']['csv_path']
+    prep_combined_csv(data_path, csv_path)
+
+    cam0_path = os.path.join(data_path, 'cam0/data')
+    cam1_path = os.path.join(data_path, 'cam1/data')
+    train_data = IMUImageDataset(
+        csv_path=csv_path,
+        cam0_image_root=cam0_path,
+        cam1_image_root=cam1_path
+    )
+    # TODO get different flight data for validation
+    val_data = IMUImageDataset(
+        csv_path=csv_path,
+        cam0_image_root=cam0_path,
+        cam1_image_root=cam1_path
+    )
     train_loader = DataLoader(train_data, batch_size=config['dataset']['train_batch_size'], shuffle=True, num_workers=config['dataset']['num_workers'])
     val_loader   = DataLoader(val_data,   batch_size=config['dataset']['train_batch_size'], num_workers=config['dataset']['num_workers'])
     
@@ -55,7 +73,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         logger=tb_logger,
         max_epochs=config["trainer"]["max_epochs"],
-        accelerator="auto"
+        accelerator="auto",
         devices=config["trainer"]["gpus"],
     )
-    trainer.fit(model, train_loader, val_loader)
+    trainer.fit(experiment, train_loader, val_loader)

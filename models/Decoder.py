@@ -15,6 +15,7 @@ class Decoder(nn.Module):
         )
 
     def forward(self, context_seq, prediction_len=None):
+        # TODO factor in prediction_len for variable output length
         summary = context_seq[:, -1, :]  # [B, F] - Take the last time step as summary
 
         pred = self.mlp(summary)  # [B, 7]

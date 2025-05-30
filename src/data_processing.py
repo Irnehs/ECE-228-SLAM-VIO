@@ -4,6 +4,45 @@ import requests
 import zipfile
 from tqdm import tqdm
 import numpy as np
+import torch
+from torchvision import transforms
+from PIL import Image
+from torch.utils.data import Dataset
+
+class IMUImageDataset(Dataset):
+    def __init__(self, csv_path, cam0_image_root, cam1_image_root, transform=None):
+        self.data = pd.read_csv(csv_path)
+        self.cam0_image_root = cam0_image_root
+        self.cam1_image_root = cam1_image_root
+        self.transform = transform or transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor()
+        ])
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        row = self.data.iloc[idx]
+
+        # Load image
+        cam0_path = os.path.join(self.cam0_image_root, row['filename_cam0'])
+        cam0_image = Image.open(cam0_path).convert("RGB")
+        cam0_image = self.transform(cam0_image)
+
+        cam1_path = os.path.join(self.cam1_image_root, row['filename_cam1'])
+        cam1_image = Image.open(cam1_path).convert("RGB")
+        cam1_image = self.transform(cam1_image)
+
+        # Load IMU features
+        imu = row[["w_x", "w_y", "w_z", "a_x", "a_y", "a_z"]].values.astype("float32")
+        imu_tensor = torch.tensor(imu)
+
+        # Load ground truth features
+        ground_truth = row[["p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]].values.astype("float32")
+        ground_truth_tensor = torch.tensor(ground_truth)
+
+        return [imu_tensor, cam0_image, cam1_image], ground_truth_tensor
 
 def download_dataset(name, url):
     data_dir = os.path.join("..", "data", name)
