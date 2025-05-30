@@ -24,8 +24,10 @@ class SLAMErrorPredictor(nn.Module):
         imu_embed_size=None,
         imu_dropout=0.3,
         imu_hidden_size=128,
+        fusion_output_dim=64,
         fusion_hidden_size=128,
         fusion_dropout=0.3,
+        decoder_hidden_size=128,
     ):
         super(SLAMErrorPredictor, self).__init__()
         self.seq_len = seq_len  # The number of image frames in the sequence - (N)
@@ -50,7 +52,10 @@ class SLAMErrorPredictor(nn.Module):
         self.fusion_dropout = (  # Default dropout for the fusion branch is 0.3
             fusion_dropout
         )
-        self.F = fusion_hidden_size  # Fusion hidden size, default is 128
+        self.fusion_hidden_size = fusion_hidden_size
+        self.F = fusion_output_dim
+
+        self.decoder_hidden_size = decoder_hidden_size  # Decoder hidden size
 
         self.imu_encoder = IMUEncoder(
             input_dim=self.M,
@@ -74,13 +79,18 @@ class SLAMErrorPredictor(nn.Module):
 
         self.fusion = FusionRNN(
             input_dim=self.E,  # E is the summed embedding size of the 3 encoders (I_e * 2 + M_e)
-            output_dim=self.F,  # F is the fusion hidden size
+            output_dim=self.F,
             hidden_dim=self.fusion_hidden_size,
             bidirectional=False,
             dropout=self.fusion_dropout,
         )
 
-        self.decoder = Decoder()
+        self.decoder = Decoder(
+            input_dim=self.F,
+            hidden_dim=self.decoder_hidden_size,  # Decoder hidden size
+            output_dim=7,  # Output is a pose delta (Δx, Δy, Δz, Δq)
+            dropout=self.fusion_dropout,
+        )
 
     def forward(self, x, prediction_len):
         """
