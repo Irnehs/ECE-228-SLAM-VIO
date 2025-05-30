@@ -35,12 +35,7 @@ if __name__ == "__main__":
     # For reproducibility
     seed_everything(config['experiment']['manual_seed'], True)
         
-    model = SLAMErrorPredictor(
-        seq_len=config['model']['seq_len'],
-        prediction_len=config['model']['prediction_len'],
-        image_embed_size=config['model']['image_embed_size'],
-        imu_embed_size=config['model']['imu_embed_size'],
-    )
+    model = SLAMErrorPredictor(**config['model'])
     experiment = Experiment(
         loss_fnc=loss_fnc,
         lr=config['trainer']['LR'],
