@@ -175,6 +175,7 @@ cython_debug/
 
 # Data and model files
 data/
+logs
 models/
 catkin_ws/build/
 catkin_ws/devel/
