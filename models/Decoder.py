@@ -15,9 +15,9 @@ class Decoder(nn.Module):
 
     def forward(self, context_seq, prediction_len=None):
         # CHECK THIS factor in prediction_len for variable output length
-        summary = context_seq[:, -1, :]  # [B, input_dim]
-        summary_repeated = summary.unsqueeze(1).repeat(1, prediction_len, 1)  
-        B, L, D = summary_repeated.shape
+        summary = context_seq[:, -1, :]  # [B, input_dim], last hidden state summary embedded
+        summary_repeated = summary.unsqueeze(1).repeat(1, prediction_len, 1)  #im not sure about this but i just created another to predict k 
+        B, L, D = summary_repeated.shape #flatten
         flat = summary_repeated.view(B * L, D)  # 
         pred_flat = self.mlp(flat)  # [B * L, output_dim]
         pred = pred_flat.view(B, prediction_len, -1)  # [B, L, output_dim]
