@@ -12,7 +12,6 @@ from PIL import Image
 from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
 
-
 class IMUImageDataset(Dataset):
     def __init__(self, csv_path, cam0_image_root, cam1_image_root, transform=None, seq_len=5, prediction_len=5):
         self.data = pd.read_csv(csv_path)
@@ -35,40 +34,43 @@ class IMUImageDataset(Dataset):
         cam0_list = []
         cam1_list = []
         imu_list = []
-        gt_list = []
-
+        pose_label_list = []
+        
         for i in range(self.seq_len):
-            # Load images
-            cam0_path = os.path.join(self.cam0_image_root, row['filename_cam0'])
-            cam0_image = Image.open(cam0_path)
-            cam0_image = self.transform(cam0_image)
-            cam0_list.append(cam0_image)
+          # Load image
+          cam0_path = os.path.join(self.cam0_image_root, row['filename_cam0'])
+          cam0_image = Image.open(cam0_path)
+          cam0_image = self.transform(cam0_image)
+          cam0_list.append(cam0_image)
 
-            cam1_path = os.path.join(self.cam1_image_root, row['filename_cam1'])
-            cam1_image = Image.open(cam1_path)
-            cam1_image = self.transform(cam1_image)
-            cam1_list.append(cam1_image)
+          cam1_path = os.path.join(self.cam1_image_root, row['filename_cam1'])
+          cam1_image = Image.open(cam1_path)
+          cam1_image = self.transform(cam1_image)
+          cam1_list.append(cam1_image)
 
-            # Load IMU features
-            imu = row[["w_x", "w_y", "w_z", "a_x", "a_y", "a_z"]].values.astype("float32")
-            imu_tensor = torch.tensor(imu)
-            imu_list.append(imu_tensor)
+          # Load IMU features
+          imu = row[["w_x", "w_y", "w_z", "a_x", "a_y", "a_z"]].values.astype("float32")
+          imu_tensor = torch.tensor(imu)
+          imu_list.append(imu_tensor)
 
+        ### no longer using ###
+        # Load ground truth features
+        # ground_truth = row[["p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]].values.astype("float32")
+        # ground_truth_tensor = torch.tensor(ground_truth)
+
+        ### VIO OUTPUT ###
+        # Load pose label (from VIO output)
         for i in range(self.prediction_len):
-            # Load ground truth features
-            ground_truth = row[["p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]].values.astype("float32")
-            ground_truth_tensor = torch.tensor(ground_truth)
-            gt_list.append(ground_truth_tensor)
-
+          pose_label = row[["p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]].values.astype("float32")
+          pose_label_tensor = torch.tensor(pose_label)
+          pose_label_list.append(pose_label_tensor)
+          
         cam0_image = torch.cat([t.unsqueeze(0) for t in cam0_list], dim=0)
         cam1_image = torch.cat([t.unsqueeze(0) for t in cam1_list], dim=0)
         imu_tensor = torch.cat([t.unsqueeze(0) for t in imu_list], dim=0)
-        ground_truth_tensor = torch.cat([t.unsqueeze(0) for t in gt_list], dim=0)
+        pose_label_tensor = torch.cat([t.unsqueeze(0) for t in pose_label_list], dim=0)
 
-        # print('cam0 shape: ', cam0_image.shape)
-        # print('imu shape: ', imu_tensor.shape)
-
-        return [imu_tensor, cam0_image, cam1_image], ground_truth_tensor
+        return [imu_tensor, cam0_image, cam1_image], pose_label_tensor
 
 def download_dataset(name, url):
     data_dir = os.path.join("data", name)
@@ -102,7 +104,7 @@ def download_dataset(name, url):
     print(f"✅ Dataset '{name}' ready in {data_dir}")
 
 
-def prep_combined_csv(input_dir, output_filepath):
+def prep_combined_csv(input_dir, vio_csv_path, output_filepath):
     def load_and_clean_csv(path):
         df = pd.read_csv(path)
         df.columns = df.columns.str.strip()
@@ -134,9 +136,10 @@ def prep_combined_csv(input_dir, output_filepath):
     cam0_df = load_and_clean_csv(os.path.join(input_dir, "cam0", "data.csv"))
     cam1_df = load_and_clean_csv(os.path.join(input_dir, "cam1", "data.csv"))
     imu_df = load_and_clean_csv(os.path.join(input_dir, "imu0", "data.csv"))
-    gt_df = load_and_clean_csv(
-        os.path.join(input_dir, "state_groundtruth_estimate0", "data.csv")
-    )
+    ### NOW UNUSED ### --> using VIO output rather than ground-truth data
+    # gt_df = load_and_clean_csv(
+    #     os.path.join(input_dir, "state_groundtruth_estimate0", "data.csv")
+    # )
 
     # Merge cam0 and cam1 by outer join
     combined = pd.merge(
@@ -154,21 +157,45 @@ def prep_combined_csv(input_dir, output_filepath):
         .reindex(ref_timestamps, method="nearest")
         .reset_index()
     )
-    gt_interp = (
-        gt_df.set_index("timestamp")
+    ### NOW UNUSED ### --> using VIO output rather than ground-truth data
+    # gt_interp = (
+    #     gt_df.set_index("timestamp")
+    #     .reindex(ref_timestamps, method="nearest")
+    #     .reset_index()
+    # )
+
+    ### VIO OUTPUT ###
+    # Load and process VIO output data
+    vio_cols = ["timestamp_s", "p_x", "p_y", "p_z", "q_w", "q_x", "q_y", "q_z"]
+    vio_df = pd.read_csv(vio_csv_path, sep=' ', names=vio_cols)
+    
+    # Convert timestamp from seconds to nanoseconds with high precision
+    # Using string manipulation to avoid floating point precision loss
+    vio_df["timestamp"] = vio_df["timestamp_s"].apply(
+        lambda x: int(str(x).replace('.', '').ljust(19, '0')[:19])
+    )
+    vio_df = vio_df.drop(columns=["timestamp_s"])
+    
+    # CRITICAL FIX: Reorder quaternion to match expected output format [q_x, q_y, q_z, q_w]
+    vio_df = vio_df[["timestamp", "p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]]
+    vio_df = vio_df.sort_values("timestamp")
+    
+    # Interpolate VIO output to match combined camera timestamps
+    vio_interp = (
+        vio_df.set_index("timestamp")
         .reindex(ref_timestamps, method="nearest")
         .reset_index()
     )
 
-    # Merge interpolated IMU/GT back into combined frame table
+    # Merge interpolated IMU/VIO back into combined frame table
     combined = combined.merge(
         imu_interp, on="timestamp", how="left", suffixes=("", "_imu")
     )
     combined = combined.merge(
-        gt_interp, on="timestamp", how="left", suffixes=("", "_gt")
+        vio_interp, on="timestamp", how="left", suffixes=("", "_gt")    # formerly gt_interp
     )
 
-    # Optional: drop rows where GT data is still missing (e.g. beginning or end of run)
+    # Optional: drop rows where VIO data is still missing (e.g. beginning or end of run)
     combined.dropna(subset=["p_x", "q_x"], inplace=True)
 
     # Final structure
@@ -285,19 +312,24 @@ if __name__ == "__main__":
     #     vicon_room_1_difficult_url
     # )
 
+
+    ### UPDATED WITH VIO OUTPUT ###
     # Prepare the combined CSV files for each dataset
     # Check if the CSV files already exist to avoid reprocessing
 
     # prep_combined_csv(
     #     os.path.join("..", "data", "vicon_room_1_easy", "mav0"),
+    #     os.path.join("..", "data", "vins_output", "V1_01_easy.csv"),          # new
     #     os.path.join("..", "data", "vicon_room_1_easy", "combined.csv")
     # )
     # prep_combined_csv(
     #     os.path.join("..", "data", "vicon_room_1_medium", "mav0"),
+    #     os.path.join("..", "data", "vins_output", "V1_02_medium.csv"),        # new
     #     os.path.join("..", "data", "vicon_room_1_medium", "combined.csv")
     # )
     # prep_combined_csv(
     #     os.path.join("..", "data", "vicon_room_1_difficult", "mav0"),
+    #     os.path.join("..", "data", "vins_output", "V1_03_difficult.csv"),     # new
     #     os.path.join("..", "data", "vicon_room_1_difficult", "combined.csv")
     # )
 
