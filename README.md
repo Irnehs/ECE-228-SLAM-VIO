@@ -8,14 +8,14 @@
 │   └── somedata.txt
 ├── environment.yml
 ├── models
-│   └── sometrainedmodel.dat
+│   └── SLAMPathError
 ├── notebooks
 │   └── data_pipeline.ipynb
 ├── README.md
 └── src
     └── data_processing.py
 ```
-Note that `data/` and `models/` must be locally populated and are ignored by Git to prevent large file uploads.
+Note that `data/` must be locally populated and are ignored by Git to prevent large file uploads.
 ## Dependency Management 
 
 We are using `conda` to manage out dependencies for this project.

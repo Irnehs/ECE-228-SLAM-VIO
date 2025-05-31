@@ -1,0 +1,37 @@
+model:
+    prediction_len: 5
+    image_width: 224
+    image_height: 224
+    image_channels: 1
+    imu_input_size: 6
+    imu_embed_size: 30
+    imu_dropout: 0.3
+    imu_hidden_size: 128
+    fusion_output_dim: 64
+    fusion_hidden_size: 128
+    fusion_dropout: 0.3
+    decoder_hidden_size: 128
+dataset:
+    data_path: "data\\vicon_room_1\\mav0"
+    csv_path: "data\\vicon_room_1\\combined.csv"
+    seq_len: 10
+    train_batch_size: 64
+    val_batch_size:  64
+    num_workers: 4
+trainer:
+    max_epochs: 20
+    LR: 0.0015
+    gpus:
+logging:
+    save_dir: "logs/"
+    name: "SLAMErrorPrediction"
+experiment:
+    weight_decay: .005
+    scheduler: "ExponentialLR"
+    scheduler_gamma: 0.975
+    step_size: 1
+    manual_seed: 228
+loss:
+    name: MSELoss
+    args:
+        # Add args if needed
