@@ -14,6 +14,7 @@ class SLAMErrorPredictor(nn.Module):
     def __init__(
         self,
         seq_len=1,
+        prediction_len=1,
         image_width=24,
         image_height=24,
         image_channels=1,
@@ -58,7 +59,7 @@ class SLAMErrorPredictor(nn.Module):
             hidden_dim=self.imu_hidden_size,
             output_dim=self.M_e,
             dropout=self.imu_dropout,
-            window_size=self.seq_len * 10,
+            window_size=self.seq_len // 10,
         )
 
         self.image_encoder_L = ImageEncoder(
@@ -102,7 +103,6 @@ class SLAMErrorPredictor(nn.Module):
         imu = x[0]  # [B, 10N, M]
         img_L = x[1]  # [B, N, C, H, W]
         img_R = x[2]  # [B, N, C, H, W]
-
 
         V_L = self.image_encoder_L(img_L)  # [B, N, I_e]
         V_R = self.image_encoder_R(img_R)  # [B, N, I_e]

@@ -13,7 +13,7 @@ from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
 
 class IMUImageDataset(Dataset):
-    def __init__(self, csv_path, cam0_image_root, cam1_image_root, transform=None):
+    def __init__(self, csv_path, cam0_image_root, cam1_image_root, transform=None, seq_len=5, prediction_len=5):
         self.data = pd.read_csv(csv_path)
         self.cam0_image_root = cam0_image_root
         self.cam1_image_root = cam1_image_root
@@ -21,6 +21,8 @@ class IMUImageDataset(Dataset):
             transforms.Resize((224, 224)),
             transforms.ToTensor()
         ])
+        self.seq_len = seq_len
+        self.prediction_len = prediction_len
 
     def __len__(self):
         return len(self.data)
@@ -28,18 +30,28 @@ class IMUImageDataset(Dataset):
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
 
-        # Load image
-        cam0_path = os.path.join(self.cam0_image_root, row['filename_cam0'])
-        cam0_image = Image.open(cam0_path)
-        cam0_image = self.transform(cam0_image)
+        # Get whole sequence and stack into a sequence
+        cam0_list = []
+        cam1_list = []
+        imu_list = []
+        pose_label_list = []
+        
+        for i in range(self.seq_len):
+          # Load image
+          cam0_path = os.path.join(self.cam0_image_root, row['filename_cam0'])
+          cam0_image = Image.open(cam0_path)
+          cam0_image = self.transform(cam0_image)
+          cam0_list.append(cam0_image)
 
-        cam1_path = os.path.join(self.cam1_image_root, row['filename_cam1'])
-        cam1_image = Image.open(cam1_path)
-        cam1_image = self.transform(cam1_image)
+          cam1_path = os.path.join(self.cam1_image_root, row['filename_cam1'])
+          cam1_image = Image.open(cam1_path)
+          cam1_image = self.transform(cam1_image)
+          cam1_list.append(cam1_image)
 
-        # Load IMU features
-        imu = row[["w_x", "w_y", "w_z", "a_x", "a_y", "a_z"]].values.astype("float32")
-        imu_tensor = torch.tensor(imu)
+          # Load IMU features
+          imu = row[["w_x", "w_y", "w_z", "a_x", "a_y", "a_z"]].values.astype("float32")
+          imu_tensor = torch.tensor(imu)
+          imu_list.append(imu_tensor)
 
         ### no longer using ###
         # Load ground truth features
@@ -48,8 +60,15 @@ class IMUImageDataset(Dataset):
 
         ### VIO OUTPUT ###
         # Load pose label (from VIO output)
-        pose_label = row[["p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]].values.astype("float32")
-        pose_label_tensor = torch.tensor(pose_label)
+        for i in range(self.prediction_len):
+          pose_label = row[["p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]].values.astype("float32")
+          pose_label_tensor = torch.tensor(pose_label)
+          pose_label_list.append(pose_label_tensor)
+          
+        cam0_image = torch.cat([t.unsqueeze(0) for t in cam0_list], dim=0)
+        cam1_image = torch.cat([t.unsqueeze(0) for t in cam1_list], dim=0)
+        imu_tensor = torch.cat([t.unsqueeze(0) for t in imu_list], dim=0)
+        pose_label_tensor = torch.cat([t.unsqueeze(0) for t in pose_label_list], dim=0)
 
         return [imu_tensor, cam0_image, cam1_image], pose_label_tensor
 

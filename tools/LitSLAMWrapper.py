@@ -3,11 +3,12 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 
-class Experiment(pl.LightningModule):
-    def __init__(self, model, loss_fnc=nn.MSELoss, lr=1e-3, weight_decay=0, scheduler=None, scheduler_gamma=None, step_size=1):
-        super(Experiment, self).__init__()
+class LitSLAMWrapper(pl.LightningModule):
+    def __init__(self, model, loss_fn=nn.MSELoss, lr=1e-3, weight_decay=0, scheduler=None, scheduler_gamma=None, step_size=1):
+        super(LitSLAMWrapper, self).__init__()
         self.model = model
-        self.save_hyperparameters(ignore=['model'])
+        self.loss_fn = loss_fn
+        self.save_hyperparameters(ignore=['model','loss_fn'])
 
     def forward(self, batch):
         return self.model(batch)

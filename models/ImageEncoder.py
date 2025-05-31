@@ -130,7 +130,7 @@ class MobileNetV2(nn.Module):
         """
         This encoder assumes images come in in (B, seq_len, C, H, W), and outputs in shape (B, seq_len, out_dim)
         """
-        print(x.shape)
+        # print(x.shape)
         B, seq_len, C, H, W = x.shape
         assert (
             seq_len == self.seq_len
