@@ -1,27 +1,34 @@
 model:
-    prediction_len: 5
-    image_width: 224
-    image_height: 224
-    image_channels: 1
+    prediction_len: 10
     imu_input_size: 6
     imu_embed_size: 30
     imu_dropout: 0.3
     imu_hidden_size: 128
+    image_embed_size: 30
     fusion_output_dim: 64
     fusion_hidden_size: 128
     fusion_dropout: 0.3
     decoder_hidden_size: 128
 dataset:
-    data_path: "data\\vicon_room_1\\mav0"
-    csv_path: "data\\vicon_room_1\\combined.csv"
-    seq_len: 10
-    train_batch_size: 64
-    val_batch_size:  64
+    train_data:
+        data_path: "data\\vicon_room_1_easy\\mav0"
+        combined_csv_path: "data\\vicon_room_1_easy\\combined.csv"
+        vio_csv_path: "data\\vins_output\\V1_01_easy.csv"
+    test_data:
+        data_path: "data\\vicon_room_1_medium\\mav0"
+        combined_csv_path: "data\\vicon_room_1_medium\\combined.csv"
+        vio_csv_path: "data\\vins_output\\V1_01_medium.csv"
+    image_width: 114
+    image_height: 114
+    image_channels: 1
+    seq_len: 5
+    train_batch_size: 32
+    val_batch_size:  16
     num_workers: 4
 trainer:
     max_epochs: 20
     LR: 0.0015
-    gpus:
+    gpus: [0]
 logging:
     save_dir: "logs/"
     name: "SLAMErrorPrediction"

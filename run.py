@@ -2,9 +2,10 @@ from lightning.pytorch import seed_everything
 from lightning.pytorch.loggers import TensorBoardLogger
 import yaml
 import torch.nn as nn
+import torch
 import lightning.pytorch as pl
 import argparse
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 import os
 
 from tools.data_processing_tools import IMUImageDataset, prep_combined_csv
@@ -12,6 +13,7 @@ from models.SLAMErrorPredictor import SLAMErrorPredictor
 from tools.LitSLAMWrapper import LitSLAMWrapper
 
 if __name__ == "__main__":
+    torch.set_float32_matmul_precision('medium')
     # Read cmd args, mainly to find config.yaml file
     parser = argparse.ArgumentParser(description='Model runner')
     parser.add_argument('--config',  '-c',
@@ -19,6 +21,9 @@ if __name__ == "__main__":
                         metavar='FILE',
                         help =  'path to the config file',
                         default='config.yaml')
+    parser.add_argument('--test',
+                        help='flag to control running test set',
+                        default=False)
 
     # Open config file
     args = parser.parse_args()
@@ -49,27 +54,75 @@ if __name__ == "__main__":
         step_size=config["experiment"]["step_size"],
     )
 
-    data_path = config['dataset']['data_path']
-    csv_path = config['dataset']['csv_path']
-    prep_combined_csv(data_path, csv_path)
+    train_data_path = config['dataset']['train_data']['data_path']
+    train_combined_csv_path = config['dataset']['train_data']['combined_csv_path']
+    train_vio_csv_path = config['dataset']['train_data']['vio_csv_path']
+    prep_combined_csv(train_data_path, train_vio_csv_path, train_combined_csv_path)
 
-    cam0_path = os.path.join(data_path, 'cam0/data')
-    cam1_path = os.path.join(data_path, 'cam1/data')
+    test_data_path = config['dataset']['train_data']['data_path']
+    test_combined_csv_path = config['dataset']['train_data']['combined_csv_path']
+    test_vio_csv_path = config['dataset']['train_data']['vio_csv_path']
+    prep_combined_csv(test_data_path, test_vio_csv_path, test_combined_csv_path)
+
+    H = config['dataset']['image_height']
+    W = config['dataset']['image_width']
+
+    cam0_path = os.path.join(train_data_path, 'cam0/data')
+    cam1_path = os.path.join(train_data_path, 'cam1/data')
+
+    # Split training data into train and val sets
     train_data = IMUImageDataset(
-        csv_path=csv_path,
+        csv_path=train_combined_csv_path,
         cam0_image_root=cam0_path,
         cam1_image_root=cam1_path,
-        seq_len=config['dataset']['seq_len']
+        seq_len=config['dataset']['seq_len'],
+        prediction_len=config['model']['prediction_len'],
+        H=H,
+        W=W,
     )
-    # TODO get different flight data for validation
-    val_data = IMUImageDataset(
-        csv_path=csv_path,
+
+    total_len = len(train_data)
+    train_len = int(0.8 * total_len)
+    val_len = total_len - train_len
+
+    generator = torch.Generator().manual_seed(228)  # fix seed so split is the same every run
+
+    train_dataset, val_dataset = random_split(
+        train_data,
+        [train_len, val_len],
+        generator=generator
+    )
+
+    # Convert sets to dataloaders
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=config['dataset']['train_batch_size'],
+        shuffle=True,  # typically shuffle the training set
+        num_workers=4,  # or however many workers you prefer
+        pin_memory=True,
+    )
+
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=config['dataset']['val_batch_size'],
+        shuffle=False,  # no need to shuffle validation
+        num_workers=4,
+        pin_memory=True,
+    )
+
+    # Dataloader for test set
+    cam0_path = os.path.join(test_data_path, 'cam0/data')
+    cam1_path = os.path.join(test_data_path, 'cam1/data')
+    test_data = IMUImageDataset(
+        csv_path=test_combined_csv_path,
         cam0_image_root=cam0_path,
         cam1_image_root=cam1_path,
-        seq_len=config['dataset']['seq_len']
+        seq_len=config['dataset']['seq_len'],
+        prediction_len=config['model']['prediction_len'],
+        H=H,
+        W=W,
     )
-    train_loader = DataLoader(train_data, batch_size=config['dataset']['train_batch_size'], shuffle=True, num_workers=config['dataset']['num_workers'])
-    val_loader   = DataLoader(val_data,   batch_size=config['dataset']['val_batch_size'], num_workers=config['dataset']['num_workers'])
+    test_loader = DataLoader(test_data, batch_size=config['dataset']['val_batch_size'], num_workers=config['dataset']['num_workers'])
     
     # Trainer
     if config["trainer"]["gpus"] is None:
@@ -86,3 +139,5 @@ if __name__ == "__main__":
         devices=devices,
     )
     trainer.fit(lit_wrapper, train_loader, val_loader)
+    if args.test:
+        trainer.test(lit_wrapper, test_loader)

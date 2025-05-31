@@ -2,23 +2,23 @@ import pandas as pd
 import os
 import requests
 import zipfile
-import random
 from tqdm import tqdm
 from typing import List, Tuple
 import numpy as np
-import torch
 from torchvision import transforms
 from PIL import Image
 from torch.utils.data import Dataset
-from sklearn.model_selection import train_test_split
+from lightning.pytorch import LightningDataModule
+import random
+import torch
 
 class IMUImageDataset(Dataset):
-    def __init__(self, csv_path, cam0_image_root, cam1_image_root, transform=None, seq_len=5, prediction_len=5):
+    def __init__(self, csv_path, cam0_image_root, cam1_image_root, transform=None, seq_len=5, prediction_len=5, H=224, W=224):
         self.data = pd.read_csv(csv_path)
         self.cam0_image_root = cam0_image_root
         self.cam1_image_root = cam1_image_root
         self.transform = transform or transforms.Compose([
-            transforms.Resize((224, 224)),
+            transforms.Resize((H, W)),
             transforms.ToTensor()
         ])
         self.seq_len = seq_len
@@ -70,6 +70,7 @@ class IMUImageDataset(Dataset):
         imu_tensor = torch.cat([t.unsqueeze(0) for t in imu_list], dim=0)
         pose_label_tensor = torch.cat([t.unsqueeze(0) for t in pose_label_list], dim=0)
 
+        # print('pose_label_tensor.shape: ', pose_label_tensor.shape)
         return [imu_tensor, cam0_image, cam1_image], pose_label_tensor
 
 def download_dataset(name, url):
@@ -233,9 +234,6 @@ def build_sequence(
     labels = torch.stack(labels)
     return [imu_data, cam0_images, cam1_images], labels
 
-import random
-import torch
-
 def build_all_random_batches(
     aStartPos: int,
     aEndPos: int,
@@ -294,128 +292,39 @@ def build_all_random_batches(
 
     return all_batches
 
-if __name__ == "__main__":
-    # Example usage
-    # vicon_room_1_easy_url = "http://robotics.ethz.ch/~asl-datasets/ijrr_euroc_mav_dataset/vicon_room1/V1_01_easy/V1_01_easy.zip"
-    # vicon_room_1_medium_url = "http://robotics.ethz.ch/~asl-datasets/ijrr_euroc_mav_dataset/vicon_room1/V1_02_medium/V1_02_medium.zip"
-    # vicon_room_1_difficult_url = "http://robotics.ethz.ch/~asl-datasets/ijrr_euroc_mav_dataset/vicon_room1/V1_03_difficult/V1_03_difficult.zip"
-    # download_dataset(
-    #     "vicon_room_1_easy",
-    #     vicon_room_1_easy_url
-    # )
-    # download_dataset(
-    #     "vicon_room_1_medium",
-    #     vicon_room_1_medium_url
-    # )
-    # download_dataset(
-    #     "vicon_room_1_difficult",
-    #     vicon_room_1_difficult_url
-    # )
+class FlightDataModule(LightningDataModule):
+    def __init__(self, train_dataset, val_dataset, test_dataset, batch_size=32, num_workers=4):
+        super().__init__()
+        self.train_dataset = train_dataset
+        self.val_dataset = val_dataset
+        self.test_dataset = test_dataset
+        self.batch_size = batch_size
+        self.num_workers = num_workers
 
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            pin_memory=False
+        )
 
-    ### UPDATED WITH VIO OUTPUT ###
-    # Prepare the combined CSV files for each dataset
-    # Check if the CSV files already exist to avoid reprocessing
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            pin_memory=False
+        )
 
-    # prep_combined_csv(
-    #     os.path.join("..", "data", "vicon_room_1_easy", "mav0"),
-    #     os.path.join("..", "data", "vins_output", "V1_01_easy.csv"),          # new
-    #     os.path.join("..", "data", "vicon_room_1_easy", "combined.csv")
-    # )
-    # prep_combined_csv(
-    #     os.path.join("..", "data", "vicon_room_1_medium", "mav0"),
-    #     os.path.join("..", "data", "vins_output", "V1_02_medium.csv"),        # new
-    #     os.path.join("..", "data", "vicon_room_1_medium", "combined.csv")
-    # )
-    # prep_combined_csv(
-    #     os.path.join("..", "data", "vicon_room_1_difficult", "mav0"),
-    #     os.path.join("..", "data", "vins_output", "V1_03_difficult.csv"),     # new
-    #     os.path.join("..", "data", "vicon_room_1_difficult", "combined.csv")
-    # )
-
-    # Load the datasets
-    easy_dataset = IMUImageDataset(
-        csv_path=os.path.join("..", "data", "vicon_room_1_easy", "combined.csv"),
-        cam0_image_root=os.path.join("..", "data", "vicon_room_1_easy", "mav0", "cam0", "data"),
-        cam1_image_root=os.path.join("..", "data", "vicon_room_1_easy", "mav0", "cam1", "data")
-    )
-    print(f"Easy dataset of size: {len(easy_dataset)} loaded successfully.")
-
-    medium_dataset = IMUImageDataset(
-        csv_path=os.path.join("..", "data", "vicon_room_1_medium", "combined.csv"),
-        cam0_image_root=os.path.join("..", "data", "vicon_room_1_medium", "mav0", "cam0", "data"),
-        cam1_image_root=os.path.join("..", "data", "vicon_room_1_medium", "mav0", "cam1", "data")
-    )
-    print(f"Medium dataset of size: {len(medium_dataset)} loaded successfully.")
-
-    difficult_dataset = IMUImageDataset(
-        csv_path=os.path.join("..", "data", "vicon_room_1_difficult", "combined.csv"),
-        cam0_image_root=os.path.join("..", "data", "vicon_room_1_difficult", "mav0", "cam0", "data"),
-        cam1_image_root=os.path.join("..", "data", "vicon_room_1_difficult", "mav0", "cam1", "data")
-    )
-    print(f"Difficult dataset of size: {len(difficult_dataset)} loaded successfully.")
-
-    # Example of building a batch
-    easy_batches = build_all_random_batches(
-        aStartPos=0,
-        aEndPos=100, # TODO: Change this to len(easy_dataset) for full dataset
-        sequenceLength=10,
-        batch_size=32,
-        dataset=easy_dataset,
-        drop_last=True,
-        seed=42
-    )
-    print(f"Number of easy batches: {len(easy_batches)}")
-
-    medium_batches = build_all_random_batches(
-        aStartPos=0,
-        aEndPos=100,# TODO: Change this to len(medium_dataset) for full dataset       sequenceLength=10,
-        sequenceLength=10,
-        batch_size=32,
-        dataset=medium_dataset,
-        drop_last=True,
-        seed=42
-    )
-    print(f"Number of medium batches: {len(medium_batches)}")
-    
-    difficult_batches = build_all_random_batches(
-        aStartPos=0,
-        aEndPos=100, # TODO: Change this to len(difficult_dataset) for full dataset
-        sequenceLength=10,
-        batch_size=32,
-        dataset=difficult_dataset,
-        drop_last=True,
-        seed=42
-    )
-    print(f"Number of difficult batches: {len(difficult_batches)}")
-
-    # Split the datasets into training and testing sets
-    easy_train_batches, easy_test_batches = train_test_split(
-        easy_batches, test_size=0.2, shuffle=True, random_state=42
-    )
-    print(f"Number of easy train batches: {len(easy_train_batches)}")
-    print(f"Number of easy test batches: {len(easy_test_batches)}")
-
-    medium_train_batches, medium_test_batches = train_test_split(
-        medium_batches, test_size=0.2, shuffle=True, random_state=42
-    )
-    print(f"Number of medium train batches: {len(medium_train_batches)}")
-    print(f"Number of medium test batches: {len(medium_test_batches)}")
-
-    difficult_train_batches, difficult_test_batches = train_test_split(
-        difficult_batches, test_size=0.2, shuffle=True, random_state=42
-    )
-    print(f"Number of difficult train batches: {len(difficult_train_batches)}")
-    print(f"Number of difficult test batches: {len(difficult_test_batches)}")
-
-    # Example of accessing a batch
-    first_easy_train_batch = easy_train_batches[0]
-    first_easy_train_inputs, first_easy_train_labels = first_easy_train_batch
-    imu_data = first_easy_train_inputs[0]  # Shape: [batch_size, seq_len, M]
-    camera0_images = first_easy_train_inputs[1]  # Shape: [batch_size, seq_len, C, H, W]
-    camera1_images = first_easy_train_inputs[2]  # Shape: [batch_size, seq_len, C, H, W]
-    print(f"IMU Data Shape: {imu_data.shape}")
-    print(f"Camera 0 Images Shape: {camera0_images.shape}")
-    print(f"Camera 1 Images Shape: {camera1_images.shape}")
-
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=False
+        )
 

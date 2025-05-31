@@ -26,6 +26,14 @@ class LitSLAMWrapper(pl.LightningModule):
         val_loss = self.loss_fn(y_pred, y)
         self.log(f"val_loss_loader{dataloader_idx}", val_loss)  # In case we want to split validation into easy/hard, we can use the index with multiple loaders
 
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
+        # called for every batch in .test()
+        pass
+
+    def test_epoch_end(self, outputs):
+        # called at the end of testing across all batches
+        pass
+
     def configure_optimizers(self):
         opt = optim.Adam(
             self.parameters(),

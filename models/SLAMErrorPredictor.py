@@ -30,6 +30,7 @@ class SLAMErrorPredictor(nn.Module):
     ):
         super(SLAMErrorPredictor, self).__init__()
         self.seq_len = seq_len  # The number of image frames in the sequence - (N)
+        self.prediction_len = prediction_len  # The number of frames in the output - (K)
 
         self.W = image_width  # Default image width is 24
         self.H = image_height  # Default image height is 24
@@ -59,7 +60,8 @@ class SLAMErrorPredictor(nn.Module):
             hidden_dim=self.imu_hidden_size,
             output_dim=self.M_e,
             dropout=self.imu_dropout,
-            window_size=self.seq_len // 10,
+            # window_size=max(self.seq_len // 10, 1),
+            window_size=1,
         )
 
         self.image_encoder_L = ImageEncoder(
@@ -89,7 +91,7 @@ class SLAMErrorPredictor(nn.Module):
             dropout=self.fusion_dropout,
         )
 
-    def forward(self, x, prediction_len=10):
+    def forward(self, x):
         """
         Assuming data pipeline feeds us a list of 3 inputs: L img, R img, IMU data, in that order of a list. Each image comes in after 10 IMU update cycles.
         image shape: [B,N,C,H,W], N = # of 20 Hz updates (seq_len)
@@ -118,7 +120,7 @@ class SLAMErrorPredictor(nn.Module):
         full_encoding = self.fusion(  # [B, N, F] where F is the fusion hidden size
             encoded_features
         )
-        out = self.decoder(  # [B, 1, 7], Estimate of the current pose at the end of the sequence
-            full_encoding, prediction_len
+        out = self.decoder(  # [B, K, 7], Estimate of the current pose at the end of the sequence
+            full_encoding, self.prediction_len
         )
         return out
