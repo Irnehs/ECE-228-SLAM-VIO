@@ -8,8 +8,8 @@ graph TD
     end
 
     IMU_Data -->|IMU input<br>B, 10N, 6| imu_rnn
-    LeftImage_Data -->|Left image<br>B, N, 3, H, W| l_image_branch
-    RightImage_Data -->|Right image<br>B, N, 3, H, W| r_image_branch
+    LeftImage_Data -->|Left image<br>B, N, 1, H, W| l_image_branch
+    RightImage_Data -->|Right image<br>B, N, 1, H, W| r_image_branch
 
     subgraph IMU_Branch[IMU Encoder<br>IMUEncoder]
         imu_rnn[RNN] --> imu_norm[Norm]
@@ -18,11 +18,11 @@ graph TD
         imu_linear --> imu_out[IMU Embedding]
     end
 
-    subgraph LI_Branch[Left Image Encoder<br>ImageEncoder]
+    subgraph LI_Branch[Left Image Encoder]
         l_image_branch[MobileNetV2]
     end
 
-    subgraph RI_Branch[Right Image Encoder<br>ImageEncoder]
+    subgraph RI_Branch[Right Image Encoder]
         r_image_branch[MobileNetV2<br>B, N, 256]
     end
 
