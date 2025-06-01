@@ -23,7 +23,7 @@ graph TD
     end
 
     subgraph RI_Branch[Right Image Encoder]
-        r_image_branch[MobileNetV2<br>B, N, 30]
+        r_image_branch[MobileNetV2]
     end
 
     imu_out -->|B, N, 7| Fusion
