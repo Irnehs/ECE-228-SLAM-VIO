@@ -35,6 +35,6 @@ graph TD
 
     Fusion -->|B, N, 64| decoder_in
     subgraph Decoder[Decoder]
-        decoder_in -->|B, N, 7| Pred[Pose Prediction]
+        decoder_in -->|B, K, 7| Pred[Pose Prediction]
     end
 ```
