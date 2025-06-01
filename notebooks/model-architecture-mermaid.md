@@ -23,17 +23,17 @@ graph TD
     end
 
     subgraph RI_Branch[Right Image Encoder]
-        r_image_branch[MobileNetV2<br>B, N, 256]
+        r_image_branch[MobileNetV2<br>B, N, 30]
     end
 
     imu_out -->|B, N, 7| Fusion
-    l_image_branch -->|B, N, 256| Fusion
-    r_image_branch -->|B, N, 256| Fusion
+    l_image_branch -->|B, N, 30| Fusion
+    r_image_branch -->|B, N, 30| Fusion
 
     subgraph Fusion
     end
 
-    Fusion -->|B, N, F| decoder_in
+    Fusion -->|B, N, 64| decoder_in
     subgraph Decoder[Decoder]
         decoder_in -->|B, N, 7| Pred[Pose Prediction]
     end
