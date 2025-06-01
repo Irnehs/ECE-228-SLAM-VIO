@@ -26,7 +26,7 @@ graph TD
         r_image_branch[MobileNetV2]
     end
 
-    imu_out -->|B, N, 7| Fusion
+    imu_out -->|B, N, 30| Fusion
     l_image_branch -->|B, N, 30| Fusion
     r_image_branch -->|B, N, 30| Fusion
 
