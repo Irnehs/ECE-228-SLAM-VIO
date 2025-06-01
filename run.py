@@ -24,26 +24,30 @@ if __name__ == "__main__":
     parser.add_argument('--test',
                         help='flag to control running test set',
                         default=False)
+    parser.add_argument('--train',
+                        help='whether or not to train model',
+                        default=True)
 
-    # Open config file
     args = parser.parse_args()
+    # Open config file
     with open(args.filename, 'r') as file:
         try:
             config = yaml.safe_load(file)
         except yaml.YAMLError as exc:
             print(exc)
 
-    tb_logger =  TensorBoardLogger(save_dir=config['logging']['save_dir'])
+    tb_logger = TensorBoardLogger(save_dir=config['logging']['save_dir'])
+
+    model = SLAMErrorPredictor(**config['model'], seq_len=config['dataset']['seq_len'])
 
     # Define loss function from config
     loss_cfg = config["loss"]
     loss_class = getattr(nn, loss_cfg["name"])
     args_dict = loss_cfg.get("args") or {}
-    loss_fnc  = loss_class(**args_dict)
+    loss_fnc = loss_class(**args_dict)
 
     seed_everything(config['experiment']['manual_seed'], True)
-        
-    model = SLAMErrorPredictor(**config['model'], seq_len=config['dataset']['seq_len'])
+
     lit_wrapper = LitSLAMWrapper(
         model,
         loss_fn=loss_fnc,
@@ -53,6 +57,9 @@ if __name__ == "__main__":
         scheduler_gamma=config["experiment"]["scheduler_gamma"],
         step_size=config["experiment"]["step_size"],
     )
+        
+    model = SLAMErrorPredictor(**config['model'], seq_len=config['dataset']['seq_len'])
+
 
     train_data_path = config['dataset']['train_data']['data_path']
     train_combined_csv_path = config['dataset']['train_data']['combined_csv_path']
@@ -97,15 +104,15 @@ if __name__ == "__main__":
     train_loader = DataLoader(
         train_dataset,
         batch_size=config['dataset']['train_batch_size'],
-        shuffle=True,  # typically shuffle the training set
-        num_workers=4,  # or however many workers you prefer
+        shuffle=True,
+        num_workers=4,
         pin_memory=True,
     )
 
     val_loader = DataLoader(
         val_dataset,
         batch_size=config['dataset']['val_batch_size'],
-        shuffle=False,  # no need to shuffle validation
+        shuffle=False,
         num_workers=4,
         pin_memory=True,
     )
@@ -113,7 +120,7 @@ if __name__ == "__main__":
     # Dataloader for test set
     cam0_path = os.path.join(test_data_path, 'cam0/data')
     cam1_path = os.path.join(test_data_path, 'cam1/data')
-    test_data = IMUImageDataset(
+    test_dataset = IMUImageDataset(
         csv_path=test_combined_csv_path,
         cam0_image_root=cam0_path,
         cam1_image_root=cam1_path,
@@ -122,8 +129,14 @@ if __name__ == "__main__":
         H=H,
         W=W,
     )
-    test_loader = DataLoader(test_data, batch_size=config['dataset']['val_batch_size'], num_workers=config['dataset']['num_workers'])
-    
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=config['dataset']['val_batch_size'],
+        shuffle=False,
+        num_workers=4,
+        pin_memory=True,
+    )
+
     # Trainer
     if config["trainer"]["gpus"] is None:
         accelerator = "cpu"
@@ -138,6 +151,27 @@ if __name__ == "__main__":
         accelerator=accelerator,
         devices=devices,
     )
-    trainer.fit(lit_wrapper, train_loader, val_loader)
+
+    ### RUN TRAINING
+    if args.train:
+        trainer.fit(lit_wrapper, train_loader, val_loader)
+
+    ### RUN TEST
     if args.test:
-        trainer.test(lit_wrapper, test_loader)
+        if not args.train:
+            # Load model from storage if not retraining
+            state_dict = torch.load("final_model.pth", map_location="cpu")
+            model.load_state_dict(state_dict)
+
+        model.to(devices)
+
+        # TODO put any test set functions in LitSLAMWrapper's pass blocks
+        if config["trainer"]["gpus"] is None:
+            accelerator = "cpu"
+            devices = 1
+        else:
+            accelerator = "gpu"
+            devices = config["trainer"]["gpus"]
+
+        if args.test:
+            trainer.test(lit_wrapper, test_loader)

@@ -18,22 +18,22 @@ dataset:
         data_path: "data\\vicon_room_1_medium\\mav0"
         combined_csv_path: "data\\vicon_room_1_medium\\combined.csv"
         vio_csv_path: "data\\vins_output\\V1_01_medium.csv"
-    image_width: 114
-    image_height: 114
+    image_width: 96
+    image_height: 96
     image_channels: 1
     seq_len: 5
     train_batch_size: 32
     val_batch_size:  16
     num_workers: 4
 trainer:
-    max_epochs: 20
-    LR: 0.0015
+    max_epochs: 100
+    LR: .001
     gpus: [0]
 logging:
     save_dir: "logs/"
     name: "SLAMErrorPrediction"
 experiment:
-    weight_decay: .005
+    weight_decay: .0001
     scheduler: "ExponentialLR"
     scheduler_gamma: 0.975
     step_size: 1
