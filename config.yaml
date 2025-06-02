@@ -15,18 +15,19 @@ dataset:
         combined_csv_path: "data/vicon_room_1_easy/combined.csv"
         vio_csv_path: "data/vins_output/V1_01_easy.csv"
     test_data:
-        data_path: "data/vicon_room_1_medium/mav0"
-        combined_csv_path: "data/vicon_room_1_medium/combined.csv"
-        vio_csv_path: "data/vins_output/V1_02_medium.csv"
+        data_path: "data/vicon_room_1_difficult/mav0"
+        combined_csv_path: "data/vicon_room_1_difficult/combined.csv"
+        vio_csv_path: "data/vins_output/V1_03_difficult.csv"
     image_width: 96
     image_height: 96
     image_channels: 1
     seq_len: 5
     train_batch_size: 32
     val_batch_size:  16
+    test_batch_size: 1
     num_workers: 4
 trainer:
-    max_epochs: 100
+    max_epochs: 50
     LR: .001
     gpus: [0]
 logging:

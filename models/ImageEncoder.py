@@ -36,7 +36,7 @@ def dwise_conv(ch_in, stride=1):
             groups=ch_in,
             bias=False,
         ),
-        nn.BatchNorm2d(ch_in),
+        nn.GroupNorm(16, ch_in),
         nn.ReLU6(inplace=True),
     )
 
@@ -44,7 +44,7 @@ def dwise_conv(ch_in, stride=1):
 def conv1x1(ch_in, ch_out):
     return nn.Sequential(
         nn.Conv2d(ch_in, ch_out, kernel_size=1, padding=0, stride=1, bias=False),
-        nn.BatchNorm2d(ch_out),
+        nn.InstanceNorm2d(ch_out, affine=True),
         nn.ReLU6(inplace=True),
     )
 
@@ -52,7 +52,7 @@ def conv1x1(ch_in, ch_out):
 def conv3x3(ch_in, ch_out, stride):
     return nn.Sequential(
         nn.Conv2d(ch_in, ch_out, kernel_size=3, padding=1, stride=stride, bias=False),
-        nn.BatchNorm2d(ch_out),
+        nn.GroupNorm(16, ch_out),
         nn.ReLU6(inplace=True),
     )
 

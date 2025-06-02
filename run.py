@@ -7,6 +7,8 @@ import lightning.pytorch as pl
 import argparse
 from torch.utils.data import DataLoader, random_split
 import os
+import matplotlib.pyplot as plt
+import numpy as np
 
 from tools.data_processing_tools import IMUImageDataset, prep_combined_csv
 from models.SLAMErrorPredictor import SLAMErrorPredictor
@@ -23,12 +25,14 @@ if __name__ == "__main__":
                         default='config.yaml')
     parser.add_argument('--test',
                         help='flag to control running test set',
-                        default=False)
+                        default='')
     parser.add_argument('--train',
                         help='whether or not to train model',
-                        default=True)
+                        default='')
 
     args = parser.parse_args()
+    args.train = bool(args.train)
+    args.test = bool(args.test)
     # Open config file
     with open(args.filename, 'r') as file:
         try:
@@ -142,7 +146,7 @@ if __name__ == "__main__":
     )
     test_loader = DataLoader(
         test_dataset,
-        batch_size=config['dataset']['val_batch_size'],
+        batch_size=config['dataset']['test_batch_size'],
         shuffle=False,
         num_workers=4,
         pin_memory=True,
@@ -157,9 +161,11 @@ if __name__ == "__main__":
     #     devices = config["trainer"]["gpus"]
     if torch.cuda.is_available():
         accelerator = "gpu"
+        device = 'cuda'
         devices = 1
     else:
         accelerator = "cpu"
+        device = 'cpu'
         devices = 1
 
 
@@ -182,19 +188,46 @@ if __name__ == "__main__":
             state_dict = torch.load("final_model.pth", map_location="cpu")
             model.load_state_dict(state_dict)
 
-        model.to(devices)
+        model.to(device)
 
-        # TODO put any test set functions in LitSLAMWrapper's pass blocks
-        if config["trainer"]["gpus"] is None:
-            if torch.backends.mps.is_available():
-                accelerator = "mps"
-                devices = 1
-            else:
-                accelerator = "cpu"
-                devices = 1
-        else:
-            accelerator = "gpu"
-            devices = config["trainer"]["gpus"]
+        all_errors = []
+        with torch.no_grad():
+            error1 = []
+            error2 = []
+            for idx, (x, y) in enumerate(test_loader):
+                data = x['data']
+                gt = y['ground_truth']
+                vio = y['vio']
 
-        if args.test:
-            trainer.test(lit_wrapper, test_loader)
+                data_device = []
+                for x in data:
+                    data_device.append(x.to(device))  # shape: [1, …]
+                gt = gt.to(device)  # shape: [1, …]
+                vio = vio.to(device)
+
+                out = model(data_device)  # forward pass
+                # if this is regression, maybe out and y are shape [1, 1] or [1, D]:
+                per_sample_loss = loss_fnc(out, vio)
+                per_sample_loss2 = loss_fnc(vio, gt)
+                # If reduction="none", then per_sample_loss might be a tensor of shape [1, …].
+                # We can collapse it to a single scalar per sample:
+                # per_sample_loss = per_sample_loss.view(per_sample_loss.size(0), -1).mean(dim=1)
+                # → shape [1], so take .item()
+
+
+                error1.append(per_sample_loss.cpu())
+                error2.append(per_sample_loss2.cpu())
+
+            x = np.arange(len(error1)) * config['dataset']['test_batch_size']  # array([0, 16, 32, 48, …])
+
+            plt.figure(figsize=(8, 3))
+            plt.plot(x, error1, linestyle="-", markersize=3)
+            plt.plot(x, error2, linestyle="-", markersize=3)
+            plt.legend(['Model vs. VIO Pose', 'VIO vs. Ground Truth Pose'])
+            plt.xlabel("Test Sample Index (sequential)")
+            plt.ylabel("MSE Error")
+            plt.title("MSE Test Pose Error on Hard Dataset")
+            plt.grid(alpha=0.3)
+            plt.tight_layout()
+            plt.show()
+        # trainer.test(lit_wrapper, test_loader)
