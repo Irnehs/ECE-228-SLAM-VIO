@@ -181,4 +181,6 @@ catkin_ws/build/
 catkin_ws/devel/
 catkin_ws/.catkin_workspace
 *.bag
-.gitmodules
+.gitmodulesvalidation_output.csv
+validation_output.csv
+miniconda.sh
