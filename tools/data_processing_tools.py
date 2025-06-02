@@ -13,7 +13,7 @@ import random
 import torch
 
 class IMUImageDataset(Dataset):
-    def __init__(self, csv_path, cam0_image_root, cam1_image_root, transform=None, seq_len=5, prediction_len=5, H=224, W=224):
+    def __init__(self, csv_path, cam0_image_root, cam1_image_root, vio_predictions_path, transform=None, seq_len=5, prediction_len=5, H=224, W=224):
         self.data = pd.read_csv(csv_path)
         self.cam0_image_root = cam0_image_root
         self.cam1_image_root = cam1_image_root
@@ -23,6 +23,20 @@ class IMUImageDataset(Dataset):
         ])
         self.seq_len = seq_len
         self.prediction_len = prediction_len
+        self.vio_predictions_path = vio_predictions_path
+        self.data['timestamp'] = self.data['timestamp'].astype(float) / 1e9
+
+        self.vio_data = pd.read_csv(self.vio_predictions_path, sep=' ', names=['timestamp', 'pred_p_x', 'pred_p_y', 'pred_p_z', 'pred_q_w', 'pred_q_x', 'pred_q_y', 'pred_q_z'])
+        self.data = pd.merge_asof(
+            self.data.sort_values('timestamp'),
+            self.vio_data.sort_values('timestamp'),
+            on='timestamp',
+            direction='nearest',
+            suffixes=('_vio', '_gt'),
+            tolerance=0.000001 # 100 us tolerance
+        )
+        self.data = self.data.dropna()
+        print(f"Loaded dataset of size {len(self.data)} samples")
 
     def __len__(self):
         return len(self.data)
@@ -34,7 +48,8 @@ class IMUImageDataset(Dataset):
         cam0_list = []
         cam1_list = []
         imu_list = []
-        pose_label_list = []
+        ground_truth_list = []
+        vio_prediction_list = []
         
         for i in range(self.seq_len):
           # Load image
@@ -61,17 +76,22 @@ class IMUImageDataset(Dataset):
         ### VIO OUTPUT ###
         # Load pose label (from VIO output)
         for i in range(self.prediction_len):
-          pose_label = row[["p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]].values.astype("float32")
-          pose_label_tensor = torch.tensor(pose_label)
-          pose_label_list.append(pose_label_tensor)
+          ground_truth = row[["p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]].values.astype("float32")
+          ground_truth_tensor = torch.tensor(ground_truth)
+          ground_truth_list.append(ground_truth_tensor)
+
+          vio_prediction = row[['pred_p_x', 'pred_p_y', 'pred_p_z', 'pred_q_w', 'pred_q_x', 'pred_q_y', 'pred_q_z']].values.astype("float32")
+          vio_prediction_tensor = torch.tensor(vio_prediction)
+          vio_prediction_list.append(vio_prediction_tensor)
+          
           
         cam0_image = torch.cat([t.unsqueeze(0) for t in cam0_list], dim=0)
         cam1_image = torch.cat([t.unsqueeze(0) for t in cam1_list], dim=0)
         imu_tensor = torch.cat([t.unsqueeze(0) for t in imu_list], dim=0)
-        pose_label_tensor = torch.cat([t.unsqueeze(0) for t in pose_label_list], dim=0)
+        ground_truth_tensor = torch.cat([t.unsqueeze(0) for t in ground_truth_list], dim=0)
+        vio_prediction_tensor = torch.cat([t.unsqueeze(0) for t in vio_prediction_list], dim=0)
 
-        # print('pose_label_tensor.shape: ', pose_label_tensor.shape)
-        return [imu_tensor, cam0_image, cam1_image], pose_label_tensor
+        return [imu_tensor, cam0_image, cam1_image], {'ground_truth': ground_truth_tensor, 'vio': vio_prediction_tensor}
 
 def download_dataset(name, url):
     data_dir = os.path.join("data", name)

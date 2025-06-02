@@ -17,7 +17,7 @@ class LitSLAMWrapper(pl.LightningModule):
     def training_step(self, batch):
             x, y = batch
             y_pred = self(x)
-            loss = self.loss_fn(y_pred, y)
+            loss = self.loss_fn(y_pred, y['ground_truth'])  # Assuming y contains ground truth poses
             self.log("train_loss", loss)
             return loss
 
@@ -27,12 +27,17 @@ class LitSLAMWrapper(pl.LightningModule):
     def validation_step(self, batch, dataloader_idx=0):
         x, y = batch
         y_pred = self(x)
-        val_loss = self.loss_fn(y_pred, y)
+        val_loss = self.loss_fn(y_pred, y['ground_truth'])  # Assuming y contains ground truth poses
         # self.log(f"val_loss_loader{dataloader_idx}", val_loss, )  # In case we want to split validation into easy/hard, we can use the index with multiple loaders
         self.log("val_loss_loader", val_loss)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         # called for every batch in .test()
+        x, y = batch
+        y_truth = y['ground_truth']  # Assuming y contains ground truth poses
+        y_vio = y['vio']  # Assuming y contains VIO poses
+        pose_pred = self(x)
+        # Insert the pose_pred, y_vio, and y_truth into a pandas DataFrame
         pass
 
     def test_epoch_end(self, outputs):
