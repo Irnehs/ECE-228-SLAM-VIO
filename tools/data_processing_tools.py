@@ -44,55 +44,55 @@ class IMUImageDataset(Dataset):
     def __getitem__(self, idx):
         row = self.data.iloc[idx]
 
-        # Get whole sequence and stack into a sequence
         cam0_list = []
         cam1_list = []
         imu_list = []
         ground_truth_list = []
         vio_prediction_list = []
-        
+        timestamp_list = []
+
         for i in range(self.seq_len):
-          # Load image
-          cam0_path = os.path.join(self.cam0_image_root, row['filename_cam0'])
-          cam0_image = Image.open(cam0_path)
-          cam0_image = self.transform(cam0_image)
-          cam0_list.append(cam0_image)
+            # Load images
+            cam0_path = os.path.join(self.cam0_image_root, row['filename_cam0'])
+            cam0_image = Image.open(cam0_path)
+            cam0_image = self.transform(cam0_image)
+            cam0_list.append(cam0_image)
 
-          cam1_path = os.path.join(self.cam1_image_root, row['filename_cam1'])
-          cam1_image = Image.open(cam1_path)
-          cam1_image = self.transform(cam1_image)
-          cam1_list.append(cam1_image)
+            cam1_path = os.path.join(self.cam1_image_root, row['filename_cam1'])
+            cam1_image = Image.open(cam1_path)
+            cam1_image = self.transform(cam1_image)
+            cam1_list.append(cam1_image)
 
-          # Load IMU features
-          imu = row[["w_x", "w_y", "w_z", "a_x", "a_y", "a_z"]].values.astype("float32")
-          imu_tensor = torch.tensor(imu)
-          imu_list.append(imu_tensor)
+            # Load IMU
+            imu = row[["w_x", "w_y", "w_z", "a_x", "a_y", "a_z"]].values.astype("float32")
+            imu_tensor = torch.tensor(imu)
+            imu_list.append(imu_tensor)
 
-        ### no longer using ###
-        # Load ground truth features
-        # ground_truth = row[["p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]].values.astype("float32")
-        # ground_truth_tensor = torch.tensor(ground_truth)
+            # Load timestamp in seconds
+            timestamp = float(row["timestamp"])
+            timestamp_list.append(torch.tensor(timestamp, dtype=torch.float32))
 
-        ### VIO OUTPUT ###
-        # Load pose label (from VIO output)
+        # Pose sequence (still returns repeated values per sample for now)
         for i in range(self.prediction_len):
-          ground_truth = row[["p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]].values.astype("float32")
-          ground_truth_tensor = torch.tensor(ground_truth)
-          ground_truth_list.append(ground_truth_tensor)
+            gt = row[["p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]].values.astype("float32")
+            vio = row[["pred_p_x", "pred_p_y", "pred_p_z", "pred_q_x", "pred_q_y", "pred_q_z", "pred_q_w"]].values.astype("float32")
+            ground_truth_list.append(torch.tensor(gt))
+            vio_prediction_list.append(torch.tensor(vio))
 
-          vio_prediction = row[['pred_p_x', 'pred_p_y', 'pred_p_z', 'pred_q_w', 'pred_q_x', 'pred_q_y', 'pred_q_z']].values.astype("float32")
-          vio_prediction_tensor = torch.tensor(vio_prediction)
-          vio_prediction_list.append(vio_prediction_tensor)
-          
-          
-        cam0_image = torch.cat([t.unsqueeze(0) for t in cam0_list], dim=0)
-        cam1_image = torch.cat([t.unsqueeze(0) for t in cam1_list], dim=0)
-        imu_tensor = torch.cat([t.unsqueeze(0) for t in imu_list], dim=0)
-        ground_truth_tensor = torch.cat([t.unsqueeze(0) for t in ground_truth_list], dim=0)
-        vio_prediction_tensor = torch.cat([t.unsqueeze(0) for t in vio_prediction_list], dim=0)
+        cam0_tensor = torch.stack(cam0_list)  # (seq_len, 3, H, W)
+        cam1_tensor = torch.stack(cam1_list)
+        imu_tensor = torch.stack(imu_list)    # (seq_len, 6)
+        timestamp_tensor = torch.stack(timestamp_list)  # (seq_len,)
+        gt_tensor = torch.stack(ground_truth_list)      # (prediction_len, 7)
+        vio_tensor = torch.stack(vio_prediction_list)   # (prediction_len, 7)
 
-        return [imu_tensor, cam0_image, cam1_image], {'ground_truth': ground_truth_tensor, 'vio': vio_prediction_tensor}
-
+        return {
+            "data": [imu_tensor, cam0_tensor, cam1_tensor],
+            "timestamp": timestamp_tensor
+        }, {
+            "ground_truth": gt_tensor,
+            "vio": vio_tensor
+        }
 def download_dataset(name, url):
     data_dir = os.path.join("data", name)
     zip_path = os.path.join(data_dir, f"{name}.zip")

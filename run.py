@@ -56,6 +56,8 @@ if __name__ == "__main__":
         scheduler=config["experiment"]["scheduler"],
         scheduler_gamma=config["experiment"]["scheduler_gamma"],
         step_size=config["experiment"]["step_size"],
+        validation_output_file=config["logging"]["validation_output_file"],
+        test_output_file=config["logging"]["testing_output_file"],
     )
         
     model = SLAMErrorPredictor(**config['model'], seq_len=config['dataset']['seq_len'])
