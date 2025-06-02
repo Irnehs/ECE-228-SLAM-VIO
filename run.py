@@ -59,8 +59,8 @@ if __name__ == "__main__":
         step_size=config["experiment"]["step_size"],
         validation_output_file=config["logging"]["validation_output_file"],
         test_output_file=config["logging"]["testing_output_file"],
-        validation_output_file=config["logging"]["validation_output_file"],
-        test_output_file=config["logging"]["testing_output_file"],
+        #validation_output_file=config["logging"]["validation_output_file"],
+        #test_output_file=config["logging"]["testing_output_file"],
     )
         
     model = SLAMErrorPredictor(**config['model'], seq_len=config['dataset']['seq_len'])
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         cam0_image_root=cam0_path,
         cam1_image_root=cam1_path,
         vio_predictions_path=train_vio_csv_path,
-        vio_predictions_path=train_vio_csv_path,
+        #vio_predictions_path=train_vio_csv_path,
         seq_len=config['dataset']['seq_len'],
         prediction_len=config['model']['prediction_len'],
         H=H,
