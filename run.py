@@ -37,6 +37,7 @@ if __name__ == "__main__":
             print(exc)
 
     tb_logger = TensorBoardLogger(save_dir=config['logging']['save_dir'])
+    print(f"TensorBoard logs will be saved to: {tb_logger.log_dir}")
 
     model = SLAMErrorPredictor(**config['model'], seq_len=config['dataset']['seq_len'])
 
@@ -56,6 +57,8 @@ if __name__ == "__main__":
         scheduler=config["experiment"]["scheduler"],
         scheduler_gamma=config["experiment"]["scheduler_gamma"],
         step_size=config["experiment"]["step_size"],
+        validation_output_file=config["logging"]["validation_output_file"],
+        test_output_file=config["logging"]["testing_output_file"],
     )
         
     model = SLAMErrorPredictor(**config['model'], seq_len=config['dataset']['seq_len'])
@@ -82,6 +85,7 @@ if __name__ == "__main__":
         csv_path=train_combined_csv_path,
         cam0_image_root=cam0_path,
         cam1_image_root=cam1_path,
+        vio_predictions_path=train_vio_csv_path,
         seq_len=config['dataset']['seq_len'],
         prediction_len=config['model']['prediction_len'],
         H=H,
@@ -124,6 +128,7 @@ if __name__ == "__main__":
         csv_path=test_combined_csv_path,
         cam0_image_root=cam0_path,
         cam1_image_root=cam1_path,
+        vio_predictions_path=test_vio_csv_path,
         seq_len=config['dataset']['seq_len'],
         prediction_len=config['model']['prediction_len'],
         H=H,
@@ -138,12 +143,13 @@ if __name__ == "__main__":
     )
 
     # Trainer
-    if config["trainer"]["gpus"] is None:
+    if config["trainer"].get("gpus") is None:
         accelerator = "cpu"
         devices = 1
     else:
         accelerator = "gpu"
         devices = config["trainer"]["gpus"]
+
 
     trainer = pl.Trainer(
         logger=tb_logger,
@@ -167,8 +173,12 @@ if __name__ == "__main__":
 
         # TODO put any test set functions in LitSLAMWrapper's pass blocks
         if config["trainer"]["gpus"] is None:
-            accelerator = "cpu"
-            devices = 1
+            if torch.backends.mps.is_available():
+                accelerator = "mps"
+                devices = 1
+            else:
+                accelerator = "cpu"
+                devices = 1
         else:
             accelerator = "gpu"
             devices = config["trainer"]["gpus"]
