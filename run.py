@@ -71,9 +71,12 @@ if __name__ == "__main__":
     train_vio_csv_path = config['dataset']['train_data']['vio_csv_path']
     prep_combined_csv(train_data_path, train_vio_csv_path, train_combined_csv_path)
 
-    test_data_path = config['dataset']['train_data']['data_path']
-    test_combined_csv_path = config['dataset']['train_data']['combined_csv_path']
-    test_vio_csv_path = config['dataset']['train_data']['vio_csv_path']
+    # test_data_path = config['dataset']['train_data']['data_path']
+    # test_combined_csv_path = config['dataset']['train_data']['combined_csv_path']
+    # test_vio_csv_path = config['dataset']['train_data']['vio_csv_path']
+    test_data_path = config['dataset']['test_data']['data_path']
+    test_combined_csv_path = config['dataset']['test_data']['combined_csv_path']
+    test_vio_csv_path = config['dataset']['test_data']['vio_csv_path']
     prep_combined_csv(test_data_path, test_vio_csv_path, test_combined_csv_path)
 
     H = config['dataset']['image_height']

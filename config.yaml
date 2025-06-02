@@ -17,7 +17,7 @@ dataset:
     test_data:
         data_path: "data/vicon_room_1_medium/mav0"
         combined_csv_path: "data/vicon_room_1_medium/combined.csv"
-        vio_csv_path: "data/vins_output/V1_01_medium.csv"
+        vio_csv_path: "data/vins_output/V1_02_medium.csv"
     image_width: 96
     image_height: 96
     image_channels: 1

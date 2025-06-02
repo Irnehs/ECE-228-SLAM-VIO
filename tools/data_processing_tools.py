@@ -157,10 +157,11 @@ def prep_combined_csv(input_dir, vio_csv_path, output_filepath):
     cam0_df = load_and_clean_csv(os.path.join(input_dir, "cam0", "data.csv"))
     cam1_df = load_and_clean_csv(os.path.join(input_dir, "cam1", "data.csv"))
     imu_df = load_and_clean_csv(os.path.join(input_dir, "imu0", "data.csv"))
-    ### NOW UNUSED ### --> using VIO output rather than ground-truth data
-    # gt_df = load_and_clean_csv(
-    #     os.path.join(input_dir, "state_groundtruth_estimate0", "data.csv")
-    # )
+    
+    # Using ground-truth data
+    gt_df = load_and_clean_csv(
+        os.path.join(input_dir, "state_groundtruth_estimate0", "data.csv")
+    )
 
     # Merge cam0 and cam1 by outer join
     combined = pd.merge(
@@ -178,12 +179,12 @@ def prep_combined_csv(input_dir, vio_csv_path, output_filepath):
         .reindex(ref_timestamps, method="nearest")
         .reset_index()
     )
-    ### NOW UNUSED ### --> using VIO output rather than ground-truth data
-    # gt_interp = (
-    #     gt_df.set_index("timestamp")
-    #     .reindex(ref_timestamps, method="nearest")
-    #     .reset_index()
-    # )
+    # Using ground-truth data
+    gt_interp = (
+        gt_df.set_index("timestamp")
+        .reindex(ref_timestamps, method="nearest")
+        .reset_index()
+    )
 
     ### VIO OUTPUT ###
     # Load and process VIO output data
@@ -197,7 +198,7 @@ def prep_combined_csv(input_dir, vio_csv_path, output_filepath):
     )
     vio_df = vio_df.drop(columns=["timestamp_s"])
     
-    # CRITICAL FIX: Reorder quaternion to match expected output format [q_x, q_y, q_z, q_w]
+    # Reorder quaternion to match expected output format [q_x, q_y, q_z, q_w]
     vio_df = vio_df[["timestamp", "p_x", "p_y", "p_z", "q_x", "q_y", "q_z", "q_w"]]
     vio_df = vio_df.sort_values("timestamp")
     
@@ -208,12 +209,12 @@ def prep_combined_csv(input_dir, vio_csv_path, output_filepath):
         .reset_index()
     )
 
-    # Merge interpolated IMU/VIO back into combined frame table
+    # Merge interpolated IMU/GT back into combined frame table
     combined = combined.merge(
         imu_interp, on="timestamp", how="left", suffixes=("", "_imu")
     )
     combined = combined.merge(
-        vio_interp, on="timestamp", how="left", suffixes=("", "_gt")    # formerly gt_interp
+        gt_interp, on="timestamp", how="left", suffixes=("", "_gt")
     )
 
     # Optional: drop rows where VIO data is still missing (e.g. beginning or end of run)
