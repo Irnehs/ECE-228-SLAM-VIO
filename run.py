@@ -82,6 +82,7 @@ if __name__ == "__main__":
         csv_path=train_combined_csv_path,
         cam0_image_root=cam0_path,
         cam1_image_root=cam1_path,
+        vio_predictions_path=train_vio_csv_path,
         seq_len=config['dataset']['seq_len'],
         prediction_len=config['model']['prediction_len'],
         H=H,
@@ -124,6 +125,7 @@ if __name__ == "__main__":
         csv_path=test_combined_csv_path,
         cam0_image_root=cam0_path,
         cam1_image_root=cam1_path,
+        vio_predictions_path=test_vio_csv_path,
         seq_len=config['dataset']['seq_len'],
         prediction_len=config['model']['prediction_len'],
         H=H,
@@ -138,7 +140,7 @@ if __name__ == "__main__":
     )
 
     # Trainer
-    if config["trainer"]["gpus"] is None:
+    if getattr(config["trainer"], "gpus", None) is None:
         accelerator = "cpu"
         devices = 1
     else:
@@ -167,8 +169,12 @@ if __name__ == "__main__":
 
         # TODO put any test set functions in LitSLAMWrapper's pass blocks
         if config["trainer"]["gpus"] is None:
-            accelerator = "cpu"
-            devices = 1
+            if torch.backends.mps.is_available():
+                accelerator = "mps"
+                devices = 1
+            else:
+                accelerator = "cpu"
+                devices = 1
         else:
             accelerator = "gpu"
             devices = config["trainer"]["gpus"]
