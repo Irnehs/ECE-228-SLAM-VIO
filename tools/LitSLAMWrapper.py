@@ -44,10 +44,10 @@ class LitSLAMWrapper(pl.LightningModule):
         vio_seq = y['vio'].view(B, 10, 7)
         gt_seq = y['ground_truth'].view(B, 10, 7)
 
-        # Display overlapping plots (VIO vs. model, VIO vs. GT)
+        # Compare loss curves
         model_vs_vio_l2 = torch.linalg.norm(pred_seq - vio_seq, dim=2).mean()
         vio_vs_gt_l2 = torch.linalg.norm(vio_seq - gt_seq, dim=2).mean()
-        # Log results to TensorBoard
+        # TensorBoard plot overlays
         self.logger.experiment.add_scalars(
             "l2_compare/combined",
             {
@@ -56,9 +56,6 @@ class LitSLAMWrapper(pl.LightningModule):
             },
             global_step=self.global_step
         )
-        print("Sample GT:", gt_seq[0, 0])
-        print("Sample VIO:", vio_seq[0, 0])
-        print("Diff:", torch.norm(vio_seq[0] - gt_seq[0], dim=1))
 
         for b in range(B):
             for i in range(10):
@@ -86,9 +83,10 @@ class LitSLAMWrapper(pl.LightningModule):
         vio_seq = y["vio"].view(B, 10, 7)
         gt_seq = y["ground_truth"].view(B, 10, 7)
 
-        # Display overlapping plots (VIO vs. model, VIO vs. GT)
+        # Compare loss curves
         model_vs_vio_l2 = torch.linalg.norm(pred_seq - vio_seq, dim=2).mean()
         vio_vs_gt_l2 = torch.linalg.norm(vio_seq - gt_seq, dim=2).mean()
+        # TensorBoard plot overlays
         self.logger.experiment.add_scalars(
             "l2_compare/combined",
             {

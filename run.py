@@ -143,12 +143,19 @@ if __name__ == "__main__":
     )
 
     # Trainer
-    if config["trainer"].get("gpus") is None:
-        accelerator = "cpu"
+    # if getattr(config["trainer"], "gpus", None) is None:
+    #     accelerator = "cpu"
+    #     devices = 1
+    # else:
+    #     accelerator = "gpu"
+    #     devices = config["trainer"]["gpus"]
+    if torch.cuda.is_available():
+        accelerator = "gpu"
         devices = 1
     else:
-        accelerator = "gpu"
-        devices = config["trainer"]["gpus"]
+        accelerator = "cpu"
+        devices = 1
+
 
 
     trainer = pl.Trainer(
