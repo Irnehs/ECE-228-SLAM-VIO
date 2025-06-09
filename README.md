@@ -23,12 +23,14 @@ ECE-228-SLAM-VIO-2/
 │   ├── data_pipeline.pdf
 │   ├── model_testing.pdf
 │   └── model_architecture_diagram.png
-├── src/
-│   ├── __pycache__/
 ├── tools/
-├── config.yaml
+│   └── __init__.py
+│   └── data_processing_tools.py - Contains utilities for preprocessing IMU and camera data.
+│   └── LitSLAMWrapper.py - PyTorch Lightning wrapper managing training and evaluation.
+├── config.yml - Centralized configuration for model, training, and dataset parameters.
+├── download_all_data.py - Downloads and organizes all required datasets
 ├── environment.yml
-├── download_all_data.py
+├── model_testing.ipynb
 ├── run.py
 ├── README.md
 └── .gitignore
