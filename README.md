@@ -1,20 +1,41 @@
-# SLAM VIO Path Error Optimization
+# Task 2: SLAM VIO Path Error Optimization
 
-## File Structure
+## Authors (Group 16)
+- Matthew Alegrado  
+- Daniel Sanei  
+- Henri Schulz  
+- Veeral Patel  
 
+## Repo Structure
 ```
-.
-├── data
-│   └── somedata.txt
+ECE-228-SLAM-VIO-2/
+├── data/
+│   └── data.csv
+├── models/
+│   ├── Decoder.py
+│   ├── FusionRNN.py
+│   ├── ImageEncoder.py
+│   ├── IMUEncoder.py
+│   └── SLAMErrorPredictor.py
+├── notebooks/
+│   ├── data_pipeline.ipynb
+│   ├── model_testing.ipynb
+│   ├── data_pipeline.pdf
+│   ├── model_testing.pdf
+│   └── model_architecture_diagram.png
+├── tools/
+│   └── __init__.py
+│   └── data_processing_tools.py - Contains utilities for preprocessing IMU and camera data.
+│   └── LitSLAMWrapper.py - PyTorch Lightning wrapper managing training and evaluation.
+├── config.yml - Centralized configuration for model, training, and dataset parameters.
+├── download_all_data.py - Downloads and organizes all required datasets
 ├── environment.yml
-├── models
-│   └── SLAMPathError
-├── notebooks
-│   └── data_pipeline.ipynb
+├── model_testing.ipynb
+├── run.py
 ├── README.md
-└── src
-    └── data_processing.py
+└── .gitignore
 ```
+
 Note that `data/` must be locally populated and are ignored by Git to prevent large file uploads.
 ## Dependency Management 
 
@@ -34,3 +55,20 @@ and then rebuild the `environment.yml` file using
 ```bash
 conda env export --from-history > environment.yml
 ```
+
+## Sample DataFrame Format (`data/data.csv`)
+
+| Timestamp | ACC_X | ACC_Y | ACC_Z | GYRO_X | GYRO_Y | GYRO_Z | Img_L | Img_R | Pos_X | Pos_Y | Pos_Z | Q_w | Q_x | Q_y | Q_z |
+|-----------|-------|-------|-------|--------|--------|--------|--------|--------|--------|--------|--------|-----|-----|-----|-----|
+| 1403636.2 | ...   | ...   | ...   | ...    | ...    | ...    | path/to/img1_L.png | path/to/img1_R.png | 0.1 | 0.2 | 0.3 | 1.0 | 0.0 | 0.0 | 0.0 |
+
+## Model Overview
+- **IMU Encoder**: Bidirectional LSTM
+- **Image Encoders**: MobileNetV2 backbones
+- **Fusion RNN**: Temporal fusion of modalities
+- **Decoder**: RNN decoder predicting K=10 pose steps
+
+## Future Work
+- Add real-time inference and ROS integration
+- Extend to additional flight scenes
+- Incorporate contrastive loss
