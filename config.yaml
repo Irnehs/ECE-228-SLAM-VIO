@@ -15,9 +15,9 @@ dataset:
         combined_csv_path: "data/vicon_room_1_easy/combined.csv"
         vio_csv_path: "data/vins_output/V1_01_easy.csv"
     test_data:
-        data_path: "data/vicon_room_1_difficult/mav0"
-        combined_csv_path: "data/vicon_room_1_difficult/combined.csv"
-        vio_csv_path: "data/vins_output/V1_03_difficult.csv"
+        data_path: "data/vicon_room_1_medium/mav0"
+        combined_csv_path: "data/vicon_room_1_medium/combined.csv"
+        vio_csv_path: "data/vins_output/V1_02_medium.csv"
     image_width: 96
     image_height: 96
     image_channels: 1
@@ -33,8 +33,8 @@ trainer:
 logging:
     save_dir: "logs/"
     name: "SLAMErrorPrediction"
-    validation_output_file: "validation_output.csv"
-    testing_output_file: "testing_output.csv"
+    validation_output_file: "validation_output_gt.csv"
+    testing_output_file: "testing_output_gt.csv"
 experiment:
     weight_decay: .0001
     scheduler: "ExponentialLR"

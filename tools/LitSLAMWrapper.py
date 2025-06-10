@@ -6,7 +6,7 @@ import torch
 import pandas as pd
 
 class LitSLAMWrapper(pl.LightningModule):
-    def __init__(self, model, validation_output_file : str, test_output_file : str, loss_fn=nn.MSELoss, lr=1e-3, weight_decay=0, scheduler=None, scheduler_gamma=None, step_size=1):
+    def __init__(self, model, validation_output_file : str, test_output_file : str, loss_fn=nn.MSELoss, lr=1e-3, weight_decay=0, scheduler=None, scheduler_gamma=None, step_size=1, mode='gt'):
         super(LitSLAMWrapper, self).__init__()
         self.model = model
         self.loss_fn = loss_fn
@@ -15,6 +15,12 @@ class LitSLAMWrapper(pl.LightningModule):
         self.test_output_file = test_output_file
         self.validation_outputs = []
         self.test_outputs = []
+        if mode == 'gt':
+            self.mode = 'ground_truth'
+        elif mode == 'vio':
+            self.mode = 'vio'
+        else:
+            assert TypeError, "Mode must either be 'gt' or 'vio"
 
         # Accumulated error variables for testing
         self.total_model_vs_vio_l2 = 0
@@ -26,19 +32,19 @@ class LitSLAMWrapper(pl.LightningModule):
     def training_step(self, batch):
         x, y = batch
         y_pred = self(x)
-        loss = self.loss_fn(y_pred, y['vio'])
+        loss = self.loss_fn(y_pred, y[self.mode])
         self.log("train_loss", loss)
         return loss
 
     def on_train_end(self) -> None:
-        torch.save(self.model.state_dict(), "final_model.pth")
+        torch.save(self.model.state_dict(), "final_model_" + self.mode + ".pth")
         
     def validation_step(self, batch, dataloader_idx=0):
         x, y = batch
         timestamps = x["timestamp"]  # shape: (B, 10)
 
         y_pred = self(x)
-        val_loss = self.loss_fn(y_pred, y['vio'])
+        val_loss = self.loss_fn(y_pred, y[self.mode])
         self.log("val_loss_loader", val_loss)
 
         keys = ['x', 'y', 'z', 'q_x', 'q_y', 'q_z', 'q_w']

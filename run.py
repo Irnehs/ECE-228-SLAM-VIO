@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, random_split
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from tools.data_processing_tools import IMUImageDataset, prep_combined_csv
 from models.SLAMErrorPredictor import SLAMErrorPredictor
@@ -29,6 +30,9 @@ if __name__ == "__main__":
     parser.add_argument('--train',
                         help='whether or not to train model',
                         default='')
+    parser.add_argument('--mode',
+                        help='train on either gt or vio data',
+                        default='gt')
 
     args = parser.parse_args()
     args.train = bool(args.train)
@@ -53,6 +57,9 @@ if __name__ == "__main__":
 
     seed_everything(config['experiment']['manual_seed'], True)
 
+    if args.mode != 'gt' and args.mode != 'vio':
+        assert TypeError, "Mode must either be 'gt' or 'vio"
+
     lit_wrapper = LitSLAMWrapper(
         model,
         loss_fn=loss_fnc,
@@ -63,8 +70,7 @@ if __name__ == "__main__":
         step_size=config["experiment"]["step_size"],
         validation_output_file=config["logging"]["validation_output_file"],
         test_output_file=config["logging"]["testing_output_file"],
-        #validation_output_file=config["logging"]["validation_output_file"],
-        #test_output_file=config["logging"]["testing_output_file"],
+        mode=args.mode,
     )
         
     model = SLAMErrorPredictor(**config['model'], seq_len=config['dataset']['seq_len'])
@@ -75,9 +81,6 @@ if __name__ == "__main__":
     train_vio_csv_path = config['dataset']['train_data']['vio_csv_path']
     prep_combined_csv(train_data_path, train_vio_csv_path, train_combined_csv_path)
 
-    # test_data_path = config['dataset']['train_data']['data_path']
-    # test_combined_csv_path = config['dataset']['train_data']['combined_csv_path']
-    # test_vio_csv_path = config['dataset']['train_data']['vio_csv_path']
     test_data_path = config['dataset']['test_data']['data_path']
     test_combined_csv_path = config['dataset']['test_data']['combined_csv_path']
     test_vio_csv_path = config['dataset']['test_data']['vio_csv_path']
@@ -152,13 +155,6 @@ if __name__ == "__main__":
         pin_memory=True,
     )
 
-    # Trainer
-    # if getattr(config["trainer"], "gpus", None) is None:
-    #     accelerator = "cpu"
-    #     devices = 1
-    # else:
-    #     accelerator = "gpu"
-    #     devices = config["trainer"]["gpus"]
     if torch.cuda.is_available():
         accelerator = "gpu"
         device = 'cuda'
@@ -185,7 +181,7 @@ if __name__ == "__main__":
     if args.test:
         if not args.train:
             # Load model from storage if not retraining
-            state_dict = torch.load("final_model.pth", map_location="cpu")
+            state_dict = torch.load("final_model_" + args.mode + ".pth", map_location="cpu")
             model.load_state_dict(state_dict)
 
         model.to(device)
@@ -194,6 +190,7 @@ if __name__ == "__main__":
         with torch.no_grad():
             error1 = []
             error2 = []
+            error3 = []
             for idx, (x, y) in enumerate(test_loader):
                 data = x['data']
                 gt = y['ground_truth']
@@ -209,6 +206,7 @@ if __name__ == "__main__":
                 # if this is regression, maybe out and y are shape [1, 1] or [1, D]:
                 per_sample_loss = loss_fnc(out, vio)
                 per_sample_loss2 = loss_fnc(vio, gt)
+                per_sample_loss3 = loss_fnc(out, gt)
                 # If reduction="none", then per_sample_loss might be a tensor of shape [1, …].
                 # We can collapse it to a single scalar per sample:
                 # per_sample_loss = per_sample_loss.view(per_sample_loss.size(0), -1).mean(dim=1)
@@ -217,17 +215,27 @@ if __name__ == "__main__":
 
                 error1.append(per_sample_loss.cpu())
                 error2.append(per_sample_loss2.cpu())
+                error3.append(per_sample_loss3.cpu())
 
             x = np.arange(len(error1)) * config['dataset']['test_batch_size']  # array([0, 16, 32, 48, …])
 
             plt.figure(figsize=(8, 3))
             plt.plot(x, error1, linestyle="-", markersize=3)
             plt.plot(x, error2, linestyle="-", markersize=3)
-            plt.legend(['Model vs. VIO Pose', 'VIO vs. Ground Truth Pose'])
+            plt.plot(x, error3, linestyle="-", markersize=3)
+            plt.legend(['Model vs. VIO Pose', 'VIO vs. Ground Truth Pose', 'Model vs. Ground Truth Pose'])
             plt.xlabel("Test Sample Index (sequential)")
             plt.ylabel("MSE Error")
             plt.title("MSE Test Pose Error on Hard Dataset")
             plt.grid(alpha=0.3)
             plt.tight_layout()
             plt.show()
+
+            df = pd.DataFrame({
+                'Model vs. VIO Pose':         error1,
+                'VIO vs. Ground Truth Pose':  error2,
+                'Model vs. Ground Truth Pose':error3,
+            })
+
+            df.to_csv('test_output_' + args.mode + '.csv', index=True)  # ‘index=False’ omits the row numbers column
         # trainer.test(lit_wrapper, test_loader)

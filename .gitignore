@@ -184,3 +184,5 @@ catkin_ws/.catkin_workspace
 .gitmodulesvalidation_output.csv
 validation_output.csv
 miniconda.sh
+
+plot.py
