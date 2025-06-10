@@ -37,7 +37,16 @@ class LitSLAMWrapper(pl.LightningModule):
         return loss
 
     def on_train_end(self) -> None:
-        torch.save(self.model.state_dict(), "final_model_" + self.mode + ".pth")
+        if hasattr(self, "trainer") and self.trainer is not None:
+            # this will save everything: model weights, optimizer state, hparams, etc.
+            if self.mode == 'ground_truth':
+                mode = 'gt'
+            else:
+                mode = self.mode
+            self.trainer.save_checkpoint(f"final_{mode}.ckpt")
+        else:
+            # fallback in case someone calls the hook outside of Trainer.fit(...)
+            torch.save(self.model.state_dict(), "final_model_{}.pth".format(self.hparams.mode))
         
     def validation_step(self, batch, dataloader_idx=0):
         x, y = batch

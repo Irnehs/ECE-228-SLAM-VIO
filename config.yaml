@@ -18,13 +18,13 @@ dataset:
         data_path: "data/vicon_room_1_medium/mav0"
         combined_csv_path: "data/vicon_room_1_medium/combined.csv"
         vio_csv_path: "data/vins_output/V1_02_medium.csv"
-    image_width: 96
-    image_height: 96
+    image_width: 72
+    image_height: 72
     image_channels: 1
     seq_len: 5
-    train_batch_size: 32
+    train_batch_size: 16
     val_batch_size:  16
-    test_batch_size: 1
+    test_batch_size: 4
     num_workers: 4
 trainer:
     max_epochs: 50

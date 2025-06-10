@@ -60,22 +60,6 @@ if __name__ == "__main__":
     if args.mode != 'gt' and args.mode != 'vio':
         assert TypeError, "Mode must either be 'gt' or 'vio"
 
-    lit_wrapper = LitSLAMWrapper(
-        model,
-        loss_fn=loss_fnc,
-        lr=config['trainer']['LR'],
-        weight_decay=config["experiment"]["weight_decay"],
-        scheduler=config["experiment"]["scheduler"],
-        scheduler_gamma=config["experiment"]["scheduler_gamma"],
-        step_size=config["experiment"]["step_size"],
-        validation_output_file=config["logging"]["validation_output_file"],
-        test_output_file=config["logging"]["testing_output_file"],
-        mode=args.mode,
-    )
-        
-    model = SLAMErrorPredictor(**config['model'], seq_len=config['dataset']['seq_len'])
-
-
     train_data_path = config['dataset']['train_data']['data_path']
     train_combined_csv_path = config['dataset']['train_data']['combined_csv_path']
     train_vio_csv_path = config['dataset']['train_data']['vio_csv_path']
@@ -98,7 +82,6 @@ if __name__ == "__main__":
         cam0_image_root=cam0_path,
         cam1_image_root=cam1_path,
         vio_predictions_path=train_vio_csv_path,
-        #vio_predictions_path=train_vio_csv_path,
         seq_len=config['dataset']['seq_len'],
         prediction_len=config['model']['prediction_len'],
         H=H,
@@ -164,8 +147,6 @@ if __name__ == "__main__":
         device = 'cpu'
         devices = 1
 
-
-
     trainer = pl.Trainer(
         logger=tb_logger,
         max_epochs=config["trainer"]["max_epochs"],
@@ -173,18 +154,42 @@ if __name__ == "__main__":
         devices=devices,
     )
 
+    if args.train:
+        lit_wrapper = LitSLAMWrapper(
+            model,
+            loss_fn=loss_fnc,
+            lr=config['trainer']['LR'],
+            weight_decay=config["experiment"]["weight_decay"],
+            scheduler=config["experiment"]["scheduler"],
+            scheduler_gamma=config["experiment"]["scheduler_gamma"],
+            step_size=config["experiment"]["step_size"],
+            validation_output_file=config["logging"]["validation_output_file"],
+            test_output_file=config["logging"]["testing_output_file"],
+            mode=args.mode,
+        )
+    else:
+        lit_wrapper = LitSLAMWrapper.load_from_checkpoint(
+            "final.ckpt",
+            model=model,
+            loss_fn=loss_fnc,
+            lr=config['trainer']['LR'],
+            weight_decay=config["experiment"]["weight_decay"],
+            scheduler=config["experiment"]["scheduler"],
+            scheduler_gamma=config["experiment"]["scheduler_gamma"],
+            step_size=config["experiment"]["step_size"],
+            validation_output_file=config["logging"]["validation_output_file"],
+            test_output_file=config["logging"]["testing_output_file"],
+            mode=args.mode,
+        )
+
     ### RUN TRAINING
     if args.train:
         trainer.fit(lit_wrapper, train_loader, val_loader)
 
     ### RUN TEST
     if args.test:
-        if not args.train:
-            # Load model from storage if not retraining
-            state_dict = torch.load("final_model_" + args.mode + ".pth", map_location="cpu")
-            model.load_state_dict(state_dict)
-
-        model.to(device)
+        model = lit_wrapper.model
+        model.to(device).eval()
 
         all_errors = []
         with torch.no_grad():
@@ -203,15 +208,10 @@ if __name__ == "__main__":
                 vio = vio.to(device)
 
                 out = model(data_device)  # forward pass
-                # if this is regression, maybe out and y are shape [1, 1] or [1, D]:
+
                 per_sample_loss = loss_fnc(out, vio)
                 per_sample_loss2 = loss_fnc(vio, gt)
                 per_sample_loss3 = loss_fnc(out, gt)
-                # If reduction="none", then per_sample_loss might be a tensor of shape [1, …].
-                # We can collapse it to a single scalar per sample:
-                # per_sample_loss = per_sample_loss.view(per_sample_loss.size(0), -1).mean(dim=1)
-                # → shape [1], so take .item()
-
 
                 error1.append(per_sample_loss.cpu())
                 error2.append(per_sample_loss2.cpu())
@@ -226,7 +226,11 @@ if __name__ == "__main__":
             plt.legend(['Model vs. VIO Pose', 'VIO vs. Ground Truth Pose', 'Model vs. Ground Truth Pose'])
             plt.xlabel("Test Sample Index (sequential)")
             plt.ylabel("MSE Error")
-            plt.title("MSE Test Pose Error on Hard Dataset")
+            if "medium" in config['dataset']['test_data']['data_path']:
+                str = "MSE Test Pose Error on Medium Dataset"
+            else:
+                str = "MSE Test Pose Error on Hard Dataset"
+            plt.title(str)
             plt.grid(alpha=0.3)
             plt.tight_layout()
             plt.show()
@@ -238,4 +242,3 @@ if __name__ == "__main__":
             })
 
             df.to_csv('test_output_' + args.mode + '.csv', index=True)  # ‘index=False’ omits the row numbers column
-        # trainer.test(lit_wrapper, test_loader)
