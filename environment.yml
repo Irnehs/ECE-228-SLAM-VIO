@@ -10,4 +10,6 @@ dependencies:
   - pandas
   - ipykernel
   - tqdm
+  - scikit-learn
+  - matplotlib
 prefix: /opt/homebrew/Caskroom/miniconda/base/envs/ece228-slam-vio
