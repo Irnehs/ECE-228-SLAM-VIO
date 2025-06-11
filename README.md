@@ -88,6 +88,8 @@ Use the following arguments to control the workflow:
 2. `--train`: Whether to run the training or load an existing model checkpoints. Checks if string is non-empty to activate, default ''.
 3. `--mode`: Controls which version of training to use, either VIO pose outputs or ground truth pose values as labels. Must either be string 'gt' or 'vio' to function.
 
+Optionally, run the `download_all_data.py` file to download the dataset, or get it from the [source](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets).
+
 ## Sample DataFrame Format (`data/data.csv`)
 
 | Timestamp | ACC_X | ACC_Y | ACC_Z | GYRO_X | GYRO_Y | GYRO_Z | Img_L | Img_R | Pos_X | Pos_Y | Pos_Z | Q_w | Q_x | Q_y | Q_z |
