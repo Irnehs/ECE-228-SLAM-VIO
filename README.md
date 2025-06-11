@@ -37,8 +37,6 @@
 ├── download_all_data.py
 ├── environment.yml
 ├── final_gt.ckpt
-├── final_model_gt.pth
-├── final_model_vio.pth
 ├── final_vio.ckpt
 ├── logs
 │   └── lightning_logs
@@ -54,7 +52,6 @@
 │   ├── model_architecture_diagram.png
 │   ├── model_architecture.ipynb
 │   └── model-architecture-mermaid.md
-├── output_gt.csv
 ├── plot.py
 ├── README.md
 ├── run.py
@@ -62,9 +59,6 @@
 │   └── squared_error.py
 ├── testing_output.csv
 ├── tools
-├── train loss.csv
-├── val loss.csv
-└── validation_output.csv
 ```
 
 Note that `data/` must be locally populated and are ignored by Git to prevent large file uploads.
@@ -86,6 +80,13 @@ and then rebuild the `environment.yml` file using
 ```bash
 conda env export --from-history > environment.yml
 ```
+
+## Running the Program
+To run the file from the terminal, use `python run.py -c config.yaml`, and edit the config file to change any hyperparameters of the model as desired. 
+Use the following arguments to control the workflow:
+1. `--test`: Whether or not to run the testing script. Checks if string is non-empty to activate, default ''.
+2. `--train`: Whether to run the training or load an existing model checkpoints. Checks if string is non-empty to activate, default ''.
+3. `--mode`: Controls which version of training to use, either VIO pose outputs or ground truth pose values as labels. Must either be string 'gt' or 'vio' to function.
 
 ## Sample DataFrame Format (`data/data.csv`)
 
