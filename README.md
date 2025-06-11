@@ -8,32 +8,63 @@
 
 ## Repo Structure
 ```
-ECE-228-SLAM-VIO-2/
-├── data/
-│   └── data.csv
-├── models/
+.
+├── catkin_ws
+│   └── src
+│       ├── CMakeLists.txt -> /opt/ros/noetic/share/catkin/cmake/toplevel.cmake
+│       └── VINS-Fusion
+├── config.yaml
+├── data
+│   ├── ground_truth
+│   │   ├── V1_01_easy_vio_vs_gt_error.csv
+│   │   ├── V1_02_medium_vio_vs_gt_error.csv
+│   │   └── V1_03_difficult_vio_vs_gt_error.csv
+│   ├── vicon_room_1_difficult
+│   │   ├── combined.csv
+│   │   └── mav0
+│   ├── vicon_room_1_easy
+│   │   ├── combined.csv
+│   │   └── mav0
+│   ├── vicon_room_1_medium
+│   │   ├── __MACOSX
+│   │   ├── combined.csv
+│   │   └── mav0
+│   └── vins_output
+│       ├── V1_01_easy.csv
+│       ├── V1_02_medium.csv
+│       ├── V1_03_difficult.csv
+│       └── vio.csv
+├── download_all_data.py
+├── environment.yml
+├── final_gt.ckpt
+├── final_model_gt.pth
+├── final_model_vio.pth
+├── final_vio.ckpt
+├── logs
+│   └── lightning_logs
+├── model_testing.ipynb
+├── models
 │   ├── Decoder.py
 │   ├── FusionRNN.py
 │   ├── ImageEncoder.py
 │   ├── IMUEncoder.py
 │   └── SLAMErrorPredictor.py
-├── notebooks/
+├── notebooks
 │   ├── data_pipeline.ipynb
-│   ├── model_testing.ipynb
-│   ├── data_pipeline.pdf
-│   ├── model_testing.pdf
-│   └── model_architecture_diagram.png
-├── tools/
-│   └── __init__.py
-│   └── data_processing_tools.py - Contains utilities for preprocessing IMU and camera data.
-│   └── LitSLAMWrapper.py - PyTorch Lightning wrapper managing training and evaluation.
-├── config.yml - Centralized configuration for model, training, and dataset parameters.
-├── download_all_data.py - Downloads and organizes all required datasets
-├── environment.yml
-├── model_testing.ipynb
-├── run.py
+│   ├── model_architecture_diagram.png
+│   ├── model_architecture.ipynb
+│   └── model-architecture-mermaid.md
+├── output_gt.csv
+├── plot.py
 ├── README.md
-└── .gitignore
+├── run.py
+├── src
+│   └── squared_error.py
+├── testing_output.csv
+├── tools
+├── train loss.csv
+├── val loss.csv
+└── validation_output.csv
 ```
 
 Note that `data/` must be locally populated and are ignored by Git to prevent large file uploads.
